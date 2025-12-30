@@ -16,7 +16,8 @@ const targetSchema = z.object({
   name: z.string().min(3, "Nome é obrigatório"),
   nickname: z.string().optional(),
   cpf: z.string().optional(),
-  periculosidade: z.enum(['BAIXA', 'MEDIA', 'ALTA', 'EXTREMA']),
+  hasPhoto: z.boolean(),
+  periculosidade: z.enum(['LOW', 'MEDIUM', 'HIGH', 'EXTREME']),
   addresses: z.array(z.object({
     label: z.string().min(1, "Tipo é obrigatório"),
     street: z.string().min(1, "Rua é obrigatória"),
@@ -40,29 +41,57 @@ interface TargetModalProps {
 export function TargetModal({ isOpen, onClose, onSave, initialData, operationId }: TargetModalProps) {
   const [conflictOp, setConflictOp] = useState<any>(null);
   const { addNotification } = useNotificationStore();
+  const [selectedOpId, setSelectedOpId] = useState(operationId);
+  const operations = operationsService.getAll();
   
-  const { register, control, handleSubmit, watch, formState: { errors } } = useForm<TargetFormValues>({
+  const { register, control, handleSubmit, watch, reset, formState: { errors } } = useForm<TargetFormValues>({
     resolver: zodResolver(targetSchema),
-    defaultValues: initialData ? {
-        name: initialData.name,
-        nickname: initialData.nickname || "",
-        cpf: initialData.cpf || "",
-        periculosidade: initialData.riskLevel as any, // mapping riskLevel to periculosidade
-        addresses: initialData.addresses.map(a => ({
-            label: "", // assuming label is street for simple mapping or adding label to Address type later
-            street: a.street,
-            number: a.number,
-            neighborhood: a.neighborhood,
-            city: a.city,
-            isConfirmed: a.isConfirmed
-        }))
-    } : {
+    defaultValues: {
       name: "",
       nickname: "",
-      periculosidade: "MEDIA",
+      cpf: "",
+      hasPhoto: false,
+      periculosidade: "MEDIUM",
       addresses: [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }]
     }
   });
+
+  useEffect(() => {
+    setSelectedOpId(operationId);
+  }, [operationId]);
+
+  useEffect(() => {
+    if (isOpen) {
+      if (initialData) {
+        reset({
+          name: initialData.name,
+          nickname: initialData.nickname || "",
+          cpf: initialData.cpf || "",
+          hasPhoto: initialData.hasPhoto || false,
+          periculosidade: initialData.riskLevel as any,
+          addresses: initialData.addresses.length > 0 
+            ? initialData.addresses.map(a => ({
+                label: "Endereço", 
+                street: a.street,
+                number: a.number,
+                neighborhood: a.neighborhood,
+                city: a.city,
+                isConfirmed: a.isConfirmed
+            }))
+            : [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }]
+        });
+      } else {
+        reset({
+          name: "",
+          nickname: "",
+          cpf: "",
+          hasPhoto: false,
+          periculosidade: "MEDIUM",
+          addresses: [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }]
+        });
+      }
+    }
+  }, [isOpen, initialData, reset]);
 
   const nicknameValue = watch("nickname");
   const cpfValue = watch("cpf");
@@ -79,7 +108,7 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
     }
 
     const timer = setTimeout(() => {
-      const conflict = operationsService.checkTargetConflict(cpfCpfClean(cpfValue) || "", nicknameValue || "", operationId);
+      const conflict = operationsService.checkTargetConflict(cpfCpfClean(cpfValue) || "", nicknameValue || "", selectedOpId);
       setConflictOp(conflict);
       
       if (conflict) {
@@ -92,7 +121,7 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [nicknameValue, cpfValue, operationId, addNotification]);
+  }, [nicknameValue, cpfValue, selectedOpId, addNotification]);
 
   const { fields, append, remove } = useFieldArray({ control, name: "addresses" });
 
@@ -103,9 +132,9 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
       nickname: values.nickname || "",
       cpf: values.cpf || "",
       hasCpf: !!values.cpf,
-      hasPhoto: initialData?.hasPhoto || false,
-      riskLevel: values.periculosidade as any,
-      operationId: operationId,
+      hasPhoto: values.hasPhoto,
+      riskLevel: values.periculosidade,
+      operationId: selectedOpId,
       addresses: values.addresses.map((a, idx) => ({
           id: initialData?.addresses[idx]?.id || `addr-${Date.now()}-${idx}`,
           street: a.street,
@@ -126,6 +155,21 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
         </DialogHeader>
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {!initialData && (
+            <div className="space-y-1">
+              <label className="text-sm font-bold text-gov-blue">Vincular à Operação</label>
+              <select 
+                value={selectedOpId}
+                onChange={(e) => setSelectedOpId(e.target.value)}
+                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {operations.map(op => (
+                  <option key={op.id} value={op.id}>{op.title} ({op.department})</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {conflictOp && (
             <div className="bg-red-50 border-2 border-red-200 p-4 rounded-lg flex gap-3 animate-pulse">
               <ShieldAlert className="h-6 w-6 text-red-600 shrink-0" />
@@ -159,12 +203,19 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
                 {...register("periculosidade")}
                 className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <option value="BAIXA">Baixa</option>
-                <option value="MEDIA">Média</option>
-                <option value="ALTA">Alta</option>
-                <option value="EXTREMA">Extrema</option>
+                <option value="LOW">Baixa</option>
+                <option value="MEDIUM">Média</option>
+                <option value="HIGH">Alta</option>
+                <option value="EXTREME">Extrema</option>
               </select>
             </div>
+          </div>
+
+          <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <input type="checkbox" {...register("hasPhoto")} id="hasPhoto" className="h-4 w-4" />
+            <label htmlFor="hasPhoto" className="text-sm font-bold text-blue-900 cursor-pointer">
+              Possui Identificação Fotográfica (Dactiloscopia/SAD)
+            </label>
           </div>
 
           <div className="space-y-4">

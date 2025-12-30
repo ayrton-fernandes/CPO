@@ -15,9 +15,10 @@ import { toast } from "sonner";
 interface OperationGeneralProps {
   operation: Operation;
   onUpdate?: () => void;
+  onEditClick?: () => void;
 }
 
-export function OperationGeneral({ operation, onUpdate }: OperationGeneralProps) {
+export function OperationGeneral({ operation, onUpdate, onEditClick }: OperationGeneralProps) {
   const { user } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState({
@@ -35,14 +36,13 @@ export function OperationGeneral({ operation, onUpdate }: OperationGeneralProps)
     }
   };
 
-  const canEdit = user?.role === 'planning' || user?.role === 'admin_master';
+  const canEdit = user?.role === 'planning' || user?.role === 'admin_master' || user?.role === 'intelligence_manager';
 
   const handleSave = () => {
     operationsService.updateOperation(operation.id, {
         resources: editForm.resources,
         assignedAgents: editForm.assignedAgents.split(",").map(s => s.trim()).filter(Boolean)
     });
-    toast.success("Dados estratégicos atualizados");
     setIsEditing(false);
     if (onUpdate) onUpdate();
   };
@@ -51,8 +51,13 @@ export function OperationGeneral({ operation, onUpdate }: OperationGeneralProps)
     <div className="space-y-6">
         <div className="grid gap-6 md:grid-cols-2">
         <Card>
-            <CardHeader>
-            <CardTitle className="text-lg uppercase tracking-tight">Dados Básicos</CardTitle>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0">
+                <CardTitle className="text-lg uppercase tracking-tight">Dados Básicos</CardTitle>
+                {onEditClick && canEdit && (
+                    <Button variant="ghost" size="sm" onClick={onEditClick} className="h-8 text-[10px] font-bold uppercase">
+                        <PenLine className="h-3 w-3 mr-2" /> Editar Dados
+                    </Button>
+                )}
             </CardHeader>
             <CardContent className="space-y-4">
             <div>

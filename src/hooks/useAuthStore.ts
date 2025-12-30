@@ -11,7 +11,7 @@ interface AuthState {
 
 // Mapeamento expandido conforme nova reunião
 const CREDENTIALS_MAP: Record<string, string> = {
-  'master': 'u-master',
+  'admin': 'u-master',
   'gerente': 'u-gerente',
   'analista': 'u-analista',
   'investigador': 'u-investigador',

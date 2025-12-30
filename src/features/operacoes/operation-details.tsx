@@ -129,7 +129,7 @@ export function OperationDetails({ id }: OperationDetailsProps) {
         </TabsContent>
 
         <TabsContent value="general" className="mt-6">
-          <OperationGeneral operation={operation} onUpdate={fetchOperation} />
+          <OperationGeneral operation={operation} onUpdate={fetchOperation} onEditClick={() => setIsEditModalOpen(true)} />
         </TabsContent>
         
         <TabsContent value="documents" className="mt-6">

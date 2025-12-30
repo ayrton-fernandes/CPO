@@ -1,11 +1,15 @@
 "use client";
 
+import { useState } from "react";
 import { Operation, Target } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { User, MapPin, Plus, Edit2, Camera, ShieldCheck, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { TargetModal } from "./target-modal";
+import { operationsService } from "@/services/operationsService";
+import { useNotificationStore } from "@/hooks/useNotificationStore";
 
 interface OperationTargetsProps {
   operation: Operation;
@@ -13,6 +17,45 @@ interface OperationTargetsProps {
 }
 
 export function OperationTargets({ operation, onUpdate }: OperationTargetsProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
+  const { addNotification } = useNotificationStore();
+
+  const handleAddTarget = () => {
+    setSelectedTarget(null);
+    setIsModalOpen(true);
+  };
+
+  const handleEditTarget = (target: Target) => {
+    setSelectedTarget(target);
+    setIsModalOpen(true);
+  };
+
+  const handleSaveTarget = (targetData: Target) => {
+    let updatedTargets;
+    if (selectedTarget) {
+      // Edit
+      updatedTargets = operation.targets.map(t => t.id === targetData.id ? targetData : t);
+      addNotification({
+        title: "Alvo Atualizado",
+        description: `Os dados de "${targetData.nickname || targetData.name}" foram atualizados.`,
+        type: 'success'
+      });
+    } else {
+      // Add new
+      updatedTargets = [...operation.targets, targetData];
+      addNotification({
+        title: "Alvo Vinculado",
+        description: `"${targetData.nickname || targetData.name}" foi adicionado à investigação.`,
+        type: 'success'
+      });
+    }
+
+    operationsService.updateTargets(operation.id, updatedTargets);
+    onUpdate();
+    setIsModalOpen(false);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -20,7 +63,7 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
             <h3 className="text-lg font-bold text-gray-800">Investigados ({operation.targets.length})</h3>
             <p className="text-sm text-gray-500">Gestão de fichas e dactiloscopia.</p>
         </div>
-        <Button size="sm">
+        <Button size="sm" onClick={handleAddTarget}>
           <Plus className="h-4 w-4 mr-2" /> Vincular Alvo
         </Button>
       </div>
@@ -51,7 +94,9 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
                             </Badge>
                         </div>
                     </div>
-                    <Button variant="ghost" size="icon"><Edit2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleEditTarget(target)}>
+                        <Edit2 className="h-4 w-4" />
+                    </Button>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] font-medium uppercase tracking-wider">
@@ -85,6 +130,14 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
           </Card>
         ))}
       </div>
+
+      <TargetModal 
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        onSave={handleSaveTarget}
+        initialData={selectedTarget}
+        operationId={operation.id}
+      />
     </div>
   );
 }
