@@ -99,7 +99,7 @@ class DatabaseService {
   }
 
   // Generic Getters/Setters
-  private get<T>(key: string): T[] {
+  get<T>(key: string): T[] {
     if (typeof window === 'undefined') return [];
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : [];
@@ -202,7 +202,18 @@ class DatabaseService {
   
   sendMessage(msg: Message) {
     const msgs = this.get<Message>(STORAGE_KEYS.MESSAGES);
-    msgs.push(msg);
+    if (msg.recipientOperationId) {
+      // Broadcast to all users in the operation
+      const op = this.getOperationById(msg.recipientOperationId);
+      if (op) {
+        op.assignedAgents.forEach(agentId => {
+          const newMsg = { ...msg, id: `msg-${Date.now()}-${agentId}`, recipientId: agentId };
+          msgs.push(newMsg);
+        });
+      }
+    } else {
+      msgs.push(msg);
+    }
     this.save(STORAGE_KEYS.MESSAGES, msgs);
   }
 
@@ -250,6 +261,56 @@ class DatabaseService {
 
   getAuditLogById(id: string): AuditLog | undefined {
     return this.get<AuditLog>(STORAGE_KEYS.AUDIT_LOGS).find(l => l.id === id);
+  }
+
+  unlinkTargetFromOperation(targetId: string, operationId: string) {
+    // 1. Update Target
+    const targets = this.getTargets();
+    const targetIndex = targets.findIndex(t => t.id === targetId);
+    if (targetIndex === -1) return; // Target not found
+
+    targets[targetIndex].linkedOperationIds = targets[targetIndex].linkedOperationIds.filter(opId => opId !== operationId);
+    this.save(STORAGE_KEYS.TARGETS, targets);
+
+    // 2. Update Operation (remove from embedded list)
+    const ops = this.getOperations();
+    const opIndex = ops.findIndex(op => op.id === operationId);
+    if (opIndex === -1) return; // Operation not found
+
+    ops[opIndex].targets = ops[opIndex].targets.filter(t => t.id !== targetId);
+    this.save(STORAGE_KEYS.OPERATIONS, ops);
+  }
+
+  deleteTarget(targetId: string) {
+    const targets = this.getTargets();
+    const targetToDelete = targets.find(t => t.id === targetId);
+    if (!targetToDelete) return;
+
+    // 1. Remove from central target list
+    const updatedTargets = targets.filter(t => t.id !== targetId);
+    this.save(STORAGE_KEYS.TARGETS, updatedTargets);
+
+    // 2. Cascade delete from all operations
+    const ops = this.getOperations();
+    ops.forEach(op => {
+        const initialCount = op.targets.length;
+        op.targets = op.targets.filter(t => t.id !== targetId);
+        if (op.targets.length < initialCount) {
+            this.saveOperation(op); // Save each affected operation
+        }
+    });
+    
+    // 3. Audit Log
+    this.addAuditLog({
+        actorId: "SISTEMA", // Placeholder
+        action: "TARGET_DELETED",
+        targetEntity: "TARGET",
+        targetId: targetId,
+        details: `Excluiu o alvo "${targetToDelete.name}" (CPF: ${targetToDelete.cpf || 'N/A'}) do sistema.`,
+        timestamp: new Date().toISOString(),
+        oldData: targetToDelete, // Save the deleted object for historical reference
+        newData: null
+    });
   }
 
   // Reset

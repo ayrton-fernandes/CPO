@@ -79,10 +79,7 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
 
   const handleUnlinkTarget = (target: Target) => {
     if (confirm(`Tem certeza que deseja desvincular "${target.name}" desta operação? O alvo permanecerá no banco global.`)) {
-        const updatedLinks = (target.linkedOperationIds || []).filter(id => id !== operation.id);
-        const unlinkedTarget = { ...target, linkedOperationIds: updatedLinks };
-        
-        operationsService.saveTarget(unlinkedTarget);
+        operationsService.unlinkTargetFromOperation(target.id, operation.id);
         toast.success("Alvo desvinculado com sucesso.");
         onUpdate();
     }
@@ -177,6 +174,7 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
         onClose={() => setIsSearchModalOpen(false)}
         onSelectTarget={handleSelectFromSearch}
         onCreateNew={handleCreateNew}
+        operationId={operation.id}
       />
 
       <TargetModal 

@@ -37,12 +37,14 @@ const PERMISSIONS: { label: string; value: UserPermission }[] = [
 
 const MENUS = [
   { label: "Dashboard", path: "/dashboard" },
+  { label: "Mensagens", path: "/messages" },
   { label: "Operações", path: "/operations" },
   { label: "Banco de Alvos", path: "/targets" },
   { label: "Validações", path: "/validations" },
   { label: "Relatórios", path: "/reports" },
-  { label: "Indicadores", path: "/indicators" },
   { label: "Gestão de Usuários", path: "/users" },
+  { label: "Indicadores", path: "/indicators" },
+  { label: "Auditoria", path: "/audit" },
 ];
 
 export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormModalProps) {
@@ -98,8 +100,9 @@ export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormM
     try {
         const dataToSave = {
             ...formData,
-            // Ensure consistency between singular role and roles array
-            role: formData.roles && formData.roles.length > 0 ? formData.roles[0] : (formData.role || "investigator"),
+            permissions: formData.permissions || [],
+            roles: formData.roles || (formData.role ? [formData.role] : ["investigator"]),
+            role: formData.role || "investigator",
         } as Omit<User, "id">;
 
         if (userToEdit) {

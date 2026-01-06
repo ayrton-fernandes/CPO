@@ -78,6 +78,29 @@ export const operationsService = {
     return updatedOp;
   },
 
+  unlinkTargetFromOperation: (targetId: string, operationId: string) => {
+    const target = database.getTargets().find(t => t.id === targetId);
+    const op = database.getOperationById(operationId);
+
+    if (target && op) {
+      database.unlinkTargetFromOperation(targetId, operationId);
+      database.addAuditLog({
+        actorId: "SISTEMA",
+        action: "DESVINCULAR ALVO",
+        targetEntity: "OPERATION",
+        targetId: operationId,
+        details: `O alvo "${target.name}" foi desvinculado da operação "${op.title}"`,
+        timestamp: new Date().toISOString(),
+        oldData: { targetId, operationId },
+        newData: null
+      });
+    }
+  },
+
+  deleteTarget: (targetId: string) => {
+    database.deleteTarget(targetId);
+  },
+
   updateTargets: (id: string, targets: Target[]): Operation | undefined => {
     // This method is tricky with the new DB structure because targets are central.
     // If we update the operation's target list directly, we might miss updating the central target store.

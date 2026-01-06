@@ -22,6 +22,7 @@ export interface User {
   roles: UserRole[];
   permissions: UserPermission[];
   email: string;
+  password?: string;
   phone?: string;
   avatar?: string;
   linkedOperations?: string[]; // Operation IDs

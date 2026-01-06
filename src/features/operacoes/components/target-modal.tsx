@@ -157,6 +157,17 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
   };
 
   const onSubmit = (values: ExtendedTargetFormValues) => {
+    // CPF Duplication Check on Create
+    if (!initialData && values.cpf) {
+        const existing = operationsService.getAllTargets().find(t => t.cpf === values.cpf);
+        if (existing) {
+            toast.error("Erro: CPF já cadastrado no sistema.", {
+                description: `O alvo "${existing.name}" já possui este CPF.`
+            });
+            return;
+        }
+    }
+
     // Ensure local context op is linked
     let finalLinks = values.linkedOperationIds || [];
     if (isLocalContext && operationId && !finalLinks.includes(operationId)) {

@@ -6,22 +6,34 @@ import { PageContainer } from "@/components/layout/page-container";
 import { operationsService } from "@/services/operationsService";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { User, ShieldAlert, MapPin, Search, Plus, Edit2 } from "lucide-react";
+import { User, ShieldAlert, MapPin, Search, Plus, Edit2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useState, useMemo, useEffect } from "react";
 import { TargetModal } from "@/features/operacoes/components/target-modal";
 import { Target } from "@/types";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+
 
 export default function TargetsPage() {
   const { isAuthenticated, user } = useAuthStore();
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
+  const [targetToDelete, setTargetToDelete] = useState<Target | null>(null);
   const [targets, setTargets] = useState<Target[]>([]);
 
-  const operations = operationsService.getAll();
+  const canDelete = user?.role === 'admin_master' || user?.role === 'intelligence_manager';
 
   const loadTargets = () => {
     setTargets(operationsService.getAllTargets());
@@ -47,6 +59,18 @@ export default function TargetsPage() {
   const handleEditTarget = (target: Target) => {
     setSelectedTarget(target);
     setIsModalOpen(true);
+  };
+
+  const handleDeleteTarget = () => {
+    if (!targetToDelete) return;
+    try {
+      operationsService.deleteTarget(targetToDelete.id);
+      toast.success("Alvo excluído com sucesso do sistema.");
+      loadTargets();
+      setTargetToDelete(null);
+    } catch (error) {
+      toast.error("Erro ao excluir alvo.");
+    }
   };
 
   const handleSaveTarget = (targetData: Target) => {
@@ -95,7 +119,7 @@ export default function TargetsPage() {
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredTargets.map((target) => (
-                <Card key={target.id} className="hover:shadow-md transition-shadow border-l-4 border-l-gov-blue">
+                <Card key={target.id} className="hover:shadow-md transition-shadow border-l-4 border-l-gov-blue flex flex-col">
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                             <div className="flex items-center gap-3">
@@ -123,19 +147,31 @@ export default function TargetsPage() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="space-y-3 flex-1 flex flex-col">
                         <div className="text-sm space-y-1">
                             <p className="flex justify-between"><span className="text-gray-500">CPF:</span> <span className="font-mono">{target.cpf || "NÃO CONSTA"}</span></p>
                             <p className="flex items-center gap-1 text-gray-500 text-xs">
                                 <MapPin className="h-3 w-3" /> {target.addresses[0]?.neighborhood || "S/N"}, {target.addresses[0]?.city || "RECIFE"}
                             </p>
                         </div>
-                        <div className="pt-2 border-t text-[10px] text-gray-400 flex justify-between items-center">
+                        <div className="pt-2 border-t text-[10px] text-gray-400 flex justify-between items-center mt-auto">
                             <span>VINCULADO À:</span>
                             <Badge variant="outline" className="text-[9px] font-bold text-gray-600 bg-gray-50">
                                 {getTargetOpTitle(target)}
                             </Badge>
                         </div>
+                         {canDelete && (
+                            <div className="pt-2 border-t">
+                                <Button 
+                                    variant="destructive" 
+                                    size="sm" 
+                                    className="w-full text-xs h-8 bg-red-100 text-red-600 hover:bg-red-200"
+                                    onClick={() => setTargetToDelete(target)}
+                                >
+                                    <Trash2 className="h-3 w-3 mr-2" /> Excluir Alvo do Sistema
+                                </Button>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
             ))}
@@ -147,6 +183,22 @@ export default function TargetsPage() {
             onSave={handleSaveTarget}
             initialData={selectedTarget}
         />
+
+        <AlertDialog open={!!targetToDelete} onOpenChange={(open) => !open && setTargetToDelete(null)}>
+            <AlertDialogContent className="bg-zinc-200">
+            <AlertDialogHeader>
+                <AlertDialogTitle>Tem certeza absoluta?</AlertDialogTitle>
+                <AlertDialogDescription>
+                Esta ação não pode ser desfeita. O alvo <span className="font-bold">"{targetToDelete?.name}"</span> será permanentemente excluído do sistema e removido de todas as operações vinculadas.
+                </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteTarget} className="bg-red-600 hover:bg-red-700">Confirmar Exclusão</AlertDialogAction>
+            </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
+
       </PageContainer>
     </div>
   );

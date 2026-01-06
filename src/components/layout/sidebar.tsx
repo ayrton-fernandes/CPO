@@ -8,11 +8,10 @@ import {
   FileText,
   ShieldAlert,
   ClipboardList,
-  LogOut,
+  Mail,
   BarChart3,
   Menu,
   X,
-  Map as MapIcon,
   RefreshCcw,
   UserSquare2
 } from "lucide-react";
@@ -35,6 +34,12 @@ const NAV_ITEMS: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+    roles: ["admin_master", "intelligence_manager", "analyst", "investigator", "planning", "management"],
+  },
+  {
+    title: "Mensagens",
+    href: "/messages",
+    icon: Mail,
     roles: ["admin_master", "intelligence_manager", "analyst", "investigator", "planning", "management"],
   },
   {
@@ -73,6 +78,12 @@ const NAV_ITEMS: NavItem[] = [
     icon: BarChart3,
     roles: ["admin_master", "planning", "management"],
   },
+   {
+    title: "Auditoria",
+    href: "/audit",
+    icon: ClipboardList,
+    roles: ["admin_master"],
+  },
 ];
 
 export function Sidebar() {
@@ -82,9 +93,13 @@ export function Sidebar() {
 
   if (!user) return null;
 
-  const filteredNavItems = NAV_ITEMS.filter((item) => 
-    item.roles.includes(user.role)
-  );
+  const filteredNavItems = NAV_ITEMS.filter((item) => {
+    // Admin Master sees everything
+    if (user.role === 'admin_master' || user.roles?.includes('admin_master')) return true;
+    
+    // Check if user has explicit access to this menu path
+    return user.accessMenus?.includes(item.href);
+  });
 
   const handleResetDemo = () => {
     operationsService.resetData();

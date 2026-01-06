@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { User } from '@/types';
 import { MOCK_USERS } from '@/services/mockData';
 
@@ -19,22 +20,29 @@ const CREDENTIALS_MAP: Record<string, string> = {
   'gestao': 'u-gestao',
 };
 
-export const useAuthStore = create<AuthState>((set) => ({
-  user: null,
-  isAuthenticated: false,
-  login: async (username, password) => {
-    await new Promise((resolve) => setTimeout(resolve, 500));
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set) => ({
+      user: null,
+      isAuthenticated: false,
+      login: async (username, password) => {
+        await new Promise((resolve) => setTimeout(resolve, 500));
 
-    if (password === '123' && CREDENTIALS_MAP[username]) {
-      const userId = CREDENTIALS_MAP[username];
-      const foundUser = MOCK_USERS.find((u) => u.id === userId);
+        if (password === '123' && CREDENTIALS_MAP[username]) {
+          const userId = CREDENTIALS_MAP[username];
+          const foundUser = MOCK_USERS.find((u) => u.id === userId);
 
-      if (foundUser) {
-        set({ user: foundUser, isAuthenticated: true });
-        return true;
-      }
+          if (foundUser) {
+            set({ user: foundUser, isAuthenticated: true });
+            return true;
+          }
+        }
+        return false;
+      },
+      logout: () => set({ user: null, isAuthenticated: false }),
+    }),
+    {
+      name: 'auth-storage',
     }
-    return false;
-  },
-  logout: () => set({ user: null, isAuthenticated: false }),
-}));
+  )
+);

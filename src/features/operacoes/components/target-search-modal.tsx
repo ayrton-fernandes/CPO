@@ -14,9 +14,10 @@ interface TargetSearchModalProps {
   onClose: () => void;
   onSelectTarget: (target: Target) => void;
   onCreateNew: () => void;
+  operationId: string;
 }
 
-export function TargetSearchModal({ isOpen, onClose, onSelectTarget, onCreateNew }: TargetSearchModalProps) {
+export function TargetSearchModal({ isOpen, onClose, onSelectTarget, onCreateNew, operationId }: TargetSearchModalProps) {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState<Target[]>([]);
   const [hasSearched, setHasSearched] = useState(false);
@@ -91,31 +92,38 @@ export function TargetSearchModal({ isOpen, onClose, onSelectTarget, onCreateNew
 
                 {hasSearched && results.length > 0 && (
                     <div className="space-y-2">
-                        {results.map(target => (
-                            <div key={target.id} className="bg-white p-3 rounded border shadow-sm flex items-center justify-between hover:bg-gray-50 transition-colors">
-                                <div>
-                                    <h4 className="font-bold text-sm text-gray-900">{target.name}</h4>
-                                    <div className="flex gap-2 text-xs text-gray-500 mt-1">
-                                        {target.nickname && <span>Vulgo: <strong>{target.nickname}</strong></span>}
-                                        {target.cpf && <span>CPF: {target.cpf}</span>}
+                        {results.map(target => {
+                            const isAlreadyLinked = target.linkedOperationIds.includes(operationId);
+                            return (
+                                <div key={target.id} className="bg-white p-3 rounded border shadow-sm flex items-center justify-between hover:bg-gray-50 transition-colors">
+                                    <div>
+                                        <h4 className="font-bold text-sm text-gray-900">{target.name}</h4>
+                                        <div className="flex gap-2 text-xs text-gray-500 mt-1">
+                                            {target.nickname && <span>Vulgo: <strong>{target.nickname}</strong></span>}
+                                            {target.cpf && <span>CPF: {target.cpf}</span>}
+                                        </div>
+                                        <div className="mt-1">
+                                            {isAlreadyLinked ? (
+                                                <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">
+                                                    Já vinculado nesta Operação
+                                                </Badge>
+                                            ) : target.linkedOperationIds.length > 0 ? (
+                                                <Badge variant="outline" className="text-[10px] bg-yellow-50 text-yellow-700 border-yellow-200">
+                                                    Em Investigação (Outra Op.)
+                                                </Badge>
+                                            ) : (
+                                                <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">
+                                                    Disponível (Banco Geral)
+                                                </Badge>
+                                            )}
+                                        </div>
                                     </div>
-                                    <div className="mt-1">
-                                        {target.operationId ? (
-                                            <Badge variant="outline" className="text-[10px] bg-yellow-50 text-yellow-700 border-yellow-200">
-                                                Em Investigação (Outra Op.)
-                                            </Badge>
-                                        ) : (
-                                            <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">
-                                                Disponível (Banco Geral)
-                                            </Badge>
-                                        )}
-                                    </div>
+                                    <Button size="sm" variant="ghost" className="text-gov-blue hover:bg-blue-50" onClick={() => onSelectTarget(target)} disabled={isAlreadyLinked}>
+                                        <LinkIcon className="h-4 w-4 mr-2" /> Vincular
+                                    </Button>
                                 </div>
-                                <Button size="sm" variant="ghost" className="text-gov-blue hover:bg-blue-50" onClick={() => onSelectTarget(target)}>
-                                    <LinkIcon className="h-4 w-4 mr-2" /> Vincular
-                                </Button>
-                            </div>
-                        ))}
+                            )
+                        })}
                     </div>
                 )}
             </div>

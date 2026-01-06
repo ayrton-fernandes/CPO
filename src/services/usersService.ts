@@ -13,6 +13,7 @@ export const usersService = {
 
   create: (userData: Omit<User, "id">): User => {
     const newUser: User = {
+      password: "123456", // Default password
       ...userData,
       id: `u-${Date.now()}`,
     };

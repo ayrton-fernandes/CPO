@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useNotificationStore } from "@/hooks/useNotificationStore";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { formatAuditLog } from "@/lib/utils";
 
 export function Header() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -208,7 +209,7 @@ export function Header() {
       </div>
 
       <Dialog open={isAuditModalOpen} onOpenChange={setIsAuditModalOpen}>
-        <DialogContent className="max-w-2xl bg-white max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-w-xl bg-white">
             <DialogHeader>
                 <DialogTitle className="flex items-center gap-2 text-gov-blue">
                     <History className="h-5 w-5" />
@@ -216,52 +217,41 @@ export function Header() {
                 </DialogTitle>
             </DialogHeader>
             {selectedAuditLog && (
-                <div className="space-y-6 py-4">
-                    <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
+                <div className="space-y-4 py-4 text-sm">
+                    <div className="grid grid-cols-2 gap-4 text-xs bg-gray-50 p-3 rounded-lg border">
                         <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Ação Realizada</p>
+                            <p className="font-bold text-gray-400 uppercase mb-1">Ação</p>
                             <p className="font-bold text-gov-blue">{selectedAuditLog.action}</p>
                         </div>
                         <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Data e Hora</p>
+                            <p className="font-bold text-gray-400 uppercase mb-1">Data</p>
                             <p className="font-medium">{new Date(selectedAuditLog.timestamp).toLocaleString('pt-BR')}</p>
                         </div>
                         <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Entidade</p>
-                            <p className="font-medium uppercase">{selectedAuditLog.targetEntity} ({selectedAuditLog.targetId})</p>
+                            <p className="font-bold text-gray-400 uppercase mb-1">Responsável</p>
+                            <p className="font-medium">{selectedAuditLog.actorId}</p>
                         </div>
-                        <div>
-                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Responsável</p>
-                            <div className="flex items-center gap-1 font-medium">
-                                <UserIcon className="h-3 w-3" />
-                                {selectedAuditLog.actorId}
-                            </div>
+                         <div>
+                            <p className="font-bold text-gray-400 uppercase mb-1">Entidade Alvo</p>
+                            <p className="font-medium">{selectedAuditLog.targetEntity} ({selectedAuditLog.targetId})</p>
                         </div>
                     </div>
 
                     <div className="space-y-2">
-                        <p className="text-xs font-bold text-gray-400 uppercase">Detalhamento</p>
-                        <p className="text-sm border-l-4 border-gov-blue pl-3 italic text-gray-600 bg-blue-50/30 py-2">
+                        <p className="text-xs font-bold text-gray-400 uppercase">Resumo da Ação</p>
+                        <p className="border-l-4 border-gov-blue pl-3 italic text-gray-600 bg-blue-50/30 py-2">
                             {selectedAuditLog.details}
                         </p>
                     </div>
 
-                    {(selectedAuditLog.oldData || selectedAuditLog.newData) && (
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                                <p className="text-xs font-bold text-red-500 uppercase">Dados Anteriores</p>
-                                <pre className="text-[10px] bg-red-50 p-3 rounded overflow-x-auto border border-red-100 max-h-40">
-                                    {JSON.stringify(selectedAuditLog.oldData, null, 2)}
-                                </pre>
-                            </div>
-                            <div className="space-y-2">
-                                <p className="text-xs font-bold text-green-600 uppercase">Novos Dados</p>
-                                <pre className="text-[10px] bg-green-50 p-3 rounded overflow-x-auto border border-green-100 max-h-40">
-                                    {JSON.stringify(selectedAuditLog.newData, null, 2)}
-                                </pre>
-                            </div>
-                        </div>
-                    )}
+                    <div className="space-y-2">
+                         <p className="text-xs font-bold text-gray-400 uppercase">Campos Alterados</p>
+                         <div className="border rounded-md p-3 bg-gray-50/50 space-y-1 text-xs">
+                            {formatAuditLog(selectedAuditLog).map((change, index) => (
+                                <p key={index} className="font-mono text-gray-700">{change}</p>
+                            ))}
+                         </div>
+                    </div>
                 </div>
             )}
         </DialogContent>
