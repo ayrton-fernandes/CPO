@@ -107,7 +107,9 @@ export function LoginForm() {
           <p className="font-semibold mb-1">Credenciais de Teste:</p>
           <ul className="list-disc pl-4 space-y-0.5">
             <li>investigador / 123</li>
-            <li>inteligencia / 123</li>
+            <li>analista / 123</li>
+            <li>gestao / 123</li>
+            <li>gerente / 123</li>
             <li>planejamento / 123</li>
             <li>admin / 123</li>
           </ul>

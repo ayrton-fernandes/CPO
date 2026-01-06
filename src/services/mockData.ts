@@ -1,12 +1,66 @@
 import { Operation, User, Target, Address } from "@/types";
 
 export const MOCK_USERS: User[] = [
-  { id: "u-master", name: "Coronel Almeida (Master)", email: "master@policia.pe.gov.br", role: "admin_master" },
-  { id: "u-gerente", name: "Delegado Ricardo", email: "gerente@policia.pe.gov.br", role: "intelligence_manager" },
-  { id: "u-analista", name: "Analista Fernanda", email: "analista@policia.pe.gov.br", role: "analyst" },
-  { id: "u-investigador", name: "Agente Silva", email: "investigador@policia.pe.gov.br", role: "investigator" },
-  { id: "u-planejamento", name: "Maj. Cavalcanti", email: "cpo@policia.pe.gov.br", role: "planning" },
-  { id: "u-gestao", name: "Secretário Executivo", email: "gestao@sds.pe.gov.br", role: "management" },
+  { 
+    id: "u-master", 
+    name: "Coronel Almeida (Master)", 
+    email: "master@policia.pe.gov.br", 
+    role: "admin_master",
+    roles: ["admin_master"],
+    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION", "APPROVE_WORKFLOW", "MANAGE_USERS", "VIEW_SENSITIVE_DATA"],
+    accessMenus: ["/dashboard", "/operations", "/targets", "/validations", "/reports", "/map", "/indicators", "/users"],
+    linkedOperations: [] // Admin sees all usually, but this is explicit
+  },
+  { 
+    id: "u-gerente", 
+    name: "Delegado Ricardo", 
+    email: "gerente@policia.pe.gov.br", 
+    role: "intelligence_manager",
+    roles: ["intelligence_manager"],
+    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION", "APPROVE_WORKFLOW", "VIEW_SENSITIVE_DATA"],
+    accessMenus: ["/dashboard", "/operations", "/targets", "/map", "/users"],
+    linkedOperations: ["op-001", "op-002"]
+  },
+  { 
+    id: "u-analista", 
+    name: "Analista Fernanda", 
+    email: "analista@policia.pe.gov.br", 
+    role: "analyst",
+    roles: ["analyst"],
+    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION"],
+    accessMenus: ["/dashboard", "/operations", "/targets", "/reports", "/map"],
+    linkedOperations: ["op-001"]
+  },
+  { 
+    id: "u-investigador", 
+    name: "Agente Silva", 
+    email: "investigador@policia.pe.gov.br", 
+    role: "investigator",
+    roles: ["investigator"],
+    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION"],
+    accessMenus: ["/dashboard", "/operations", "/reports"],
+    linkedOperations: ["op-001", "op-002"]
+  },
+  { 
+    id: "u-planejamento", 
+    name: "Maj. Cavalcanti", 
+    email: "cpo@policia.pe.gov.br", 
+    role: "planning",
+    roles: ["planning"],
+    permissions: ["VIEW_DASHBOARD", "APPROVE_WORKFLOW"],
+    accessMenus: ["/dashboard", "/targets", "/validations", "/map", "/indicators"],
+    linkedOperations: []
+  },
+  { 
+    id: "u-gestao", 
+    name: "Secretário Executivo", 
+    email: "gestao@sds.pe.gov.br", 
+    role: "management",
+    roles: ["management"],
+    permissions: ["VIEW_DASHBOARD"],
+    accessMenus: ["/dashboard", "/indicators"],
+    linkedOperations: []
+  },
 ];
 
 // Helper para calcular maturidade de uma operação baseada em seus alvos
@@ -34,6 +88,7 @@ const MOCK_TARGETS: Target[] = [
     hasCpf: true,
     hasPhoto: true,
     operationId: "op-001",
+    linkedOperationIds: ["op-001"],
     riskLevel: "HIGH",
     addresses: [
       { id: "a-1", street: "Rua do Sol", number: "10", neighborhood: "Boa Vista", city: "Recife", isConfirmed: true }
@@ -47,6 +102,7 @@ const MOCK_TARGETS: Target[] = [
     hasCpf: true,
     hasPhoto: false,
     operationId: "op-001",
+    linkedOperationIds: ["op-001"],
     riskLevel: "EXTREME",
     addresses: [
       { id: "a-2", street: "Av. Agamenon", number: "500", neighborhood: "Derby", city: "Recife", isConfirmed: false }

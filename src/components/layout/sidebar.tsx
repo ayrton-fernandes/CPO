@@ -62,10 +62,10 @@ const NAV_ITEMS: NavItem[] = [
     roles: ["admin_master", "analyst", "investigator"],
   },
   {
-    title: "Mapa Tático",
-    href: "/map",
-    icon: MapIcon,
-    roles: ["admin_master", "intelligence_manager", "analyst", "planning"],
+    title: "Banco de Usuários",
+    href: "/users",
+    icon: UserSquare2,
+    roles: ["admin_master", "intelligence_manager"],
   },
   {
     title: "Indicadores",
@@ -77,7 +77,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user, logout } = useAuthStore();
+  const { user } = useAuthStore();
   const [isOpen, setIsOpen] = useState(false);
 
   if (!user) return null;
@@ -159,16 +159,6 @@ export function Sidebar() {
                     <span className="text-[10px] text-gray-500 truncate capitalize">{user.role}</span>
                 </div>
             </div>
-            <button 
-                onClick={() => {
-                    logout();
-                    window.location.href = "/login";
-                }}
-                className="flex w-full items-center gap-2 rounded-md px-2 py-2 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-            >
-                <LogOut className="h-4 w-4" />
-                Sair
-            </button>
         </div>
       </aside>
     </>

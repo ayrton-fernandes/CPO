@@ -12,18 +12,74 @@ import { toast } from "sonner";
 import { Bell, Moon, Shield, Save } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
+import { usersService } from "@/services/usersService";
+import { database } from "@/services/database";
+
 export default function SettingsPage() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
+  const [profileData, setProfileData] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    avatar: ""
+  });
 
   useEffect(() => {
     if (!isAuthenticated) {
       router.push("/login");
+    } else if (user) {
+        setProfileData({
+            name: user.name || "",
+            email: user.email || "",
+            phone: user.phone || "",
+            avatar: user.avatar || ""
+        });
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, user, router]);
+
+  const canManageCredentials = user?.permissions?.includes('SELF_MANAGE_CREDENTIALS');
 
   const handleSave = () => {
     toast.success("Configurações salvas com sucesso!");
+  };
+
+  const handleSaveProfile = () => {
+    if (!user) return;
+    
+    try {
+        usersService.update(user.id, {
+            name: profileData.name,
+            phone: profileData.phone,
+            avatar: profileData.avatar,
+            // Only update email if they have permission
+            ...(canManageCredentials ? { email: profileData.email } : {})
+        });
+        toast.success("Perfil atualizado com sucesso!");
+    } catch (error) {
+        toast.error("Erro ao atualizar perfil.");
+    }
+  };
+
+  const handleRequestCredentialChange = () => {
+    if (!user) return;
+
+    const masterUser = usersService.getAll().find(u => u.role === 'admin_master');
+    if (masterUser) {
+        database.addNotification({
+            id: `notif-${Date.now()}`,
+            userId: masterUser.id,
+            type: 'CREDENTIAL_CHANGE_REQUEST',
+            title: 'Solicitação de Alteração de Credenciais',
+            description: `O usuário ${user.name} (${user.id}) solicitou uma alteração em suas credenciais de acesso.`,
+            createdAt: new Date().toISOString(),
+            isRead: false,
+            metadata: { requesterId: user.id }
+        });
+        toast.info("Solicitação enviada ao Administrador Master.");
+    } else {
+        toast.error("Erro: Administrador Master não encontrado.");
+    }
   };
 
   if (!isAuthenticated || !user) return null;
@@ -54,25 +110,49 @@ export default function SettingsPage() {
                         <div className="grid md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Nome Completo</label>
-                                <Input defaultValue={user.name} disabled />
+                                <Input 
+                                    value={profileData.name} 
+                                    onChange={(e) => setProfileData({...profileData, name: e.target.value})}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">E-mail Institucional</label>
-                                <Input defaultValue={user.email} disabled />
+                                <Input 
+                                    value={profileData.email} 
+                                    disabled={!canManageCredentials}
+                                    onChange={(e) => setProfileData({...profileData, email: e.target.value})}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium">Telefone / WhatsApp</label>
+                                <Input 
+                                    value={profileData.phone} 
+                                    placeholder="(81) 90000-0000"
+                                    onChange={(e) => setProfileData({...profileData, phone: e.target.value})}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Função / Cargo</label>
                                 <Input defaultValue={user.role.toUpperCase()} disabled />
                             </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-medium">ID Funcional</label>
-                                <Input defaultValue={user.id} disabled />
-                            </div>
                         </div>
-                        <div className="pt-4">
-                            <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50">
-                                Solicitar Alteração de Dados
+                        
+                        <div className="pt-4 flex flex-col sm:flex-row gap-3">
+                            <Button onClick={handleSaveProfile} className="bg-gov-blue">
+                                <Save className="mr-2 h-4 w-4" /> Salvar Alterações de Perfil
                             </Button>
+                            
+                            {!canManageCredentials && (
+                                <Button variant="outline" onClick={handleRequestCredentialChange} className="text-red-600 border-red-200 hover:bg-red-50">
+                                    Solicitar Alteração de Credenciais
+                                </Button>
+                            )}
+                            
+                            {canManageCredentials && (
+                                <Button variant="outline" className="text-gov-blue">
+                                    Alterar Senha de Acesso
+                                </Button>
+                            )}
                         </div>
                     </CardContent>
                 </Card>

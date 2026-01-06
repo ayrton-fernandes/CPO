@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Operation } from "@/types";
 import { operationsService } from "@/services/operationsService";
-import { useNotificationStore } from "@/hooks/useNotificationStore";
+import { toast } from "sonner";
 
 interface EditOperationModalProps {
   operation: Operation;
@@ -17,7 +17,6 @@ interface EditOperationModalProps {
 }
 
 export function EditOperationModal({ operation, isOpen, onClose, onUpdate }: EditOperationModalProps) {
-  const { addNotification } = useNotificationStore();
   const [formData, setFormData] = useState({
     title: operation.title,
     description: operation.description,
@@ -43,10 +42,8 @@ export function EditOperationModal({ operation, isOpen, onClose, onUpdate }: Edi
 
   const handleSave = () => {
     operationsService.updateOperation(operation.id, formData);
-    addNotification({
-      title: "Operação Atualizada",
-      description: `Os dados da operação "${formData.title}" foram salvos com sucesso.`,
-      type: 'success'
+    toast.success("Operação Atualizada", {
+      description: `Os dados da operação "${formData.title}" foram salvos com sucesso.`
     });
     onUpdate();
     onClose();

@@ -4,7 +4,9 @@ import { useState } from "react";
 import { Operation, OperationStatus } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, ArrowRight, AlertTriangle, Archive, Send, PackageSearch } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { CheckCircle2, ArrowRight, AlertTriangle, Archive, Send, PackageSearch, ShieldAlert } from "lucide-react";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { operationsService } from "@/services/operationsService";
 import { toast } from "sonner";
@@ -27,6 +29,8 @@ const STEPS = [
 export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProps) {
   const { user } = useAuthStore();
   const [isCorrectionOpen, setIsCorrectionOpen] = useState(false);
+  const [isForceApprovalOpen, setIsForceApprovalOpen] = useState(false);
+  const [justification, setJustification] = useState("");
 
   if (!user) return null;
 
@@ -46,12 +50,43 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
     setIsCorrectionOpen(false);
   };
 
+  const handleForceApproval = () => {
+    if (!justification.trim()) {
+        toast.error("A justificativa é obrigatória.");
+        return;
+    }
+
+    // Update with forced approval
+    const updatedHistory = [
+        ...(operation.validationHistory || []),
+        {
+            id: `val-${Date.now()}`,
+            status: 'APPROVED' as const,
+            reason: `APROVAÇÃO FORÇADA: ${justification}`,
+            userId: user.id,
+            date: new Date().toISOString()
+        }
+    ];
+
+    operationsService.updateOperation(operation.id, {
+        status: 'PLANEJAMENTO',
+        validationHistory: updatedHistory
+    });
+
+    toast.success("Operação aprovada com ressalvas (Forçada).");
+    setIsForceApprovalOpen(false);
+    setJustification("");
+    onUpdate();
+  };
+
   const renderActions = () => {
     const { role } = user;
     const { status } = operation;
 
     // Ações para Inteligência
     if ((role === 'intelligence_manager' || role === 'analyst' || role === 'admin_master') && status === 'EM_ANALISE') {
+        const canForce = role === 'admin_master' || role === 'intelligence_manager';
+
         return (
             <div className="flex flex-col gap-3">
                 <div className={cn(
@@ -65,13 +100,26 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
                             : "Maturidade ideal. A operação pode ser enviada para validação estratégica."}
                     </p>
                 </div>
-                <Button 
-                    onClick={() => handleStatusChange('AGUARDANDO_VALIDACAO')} 
-                    disabled={isMaturityLow}
-                    className="w-full sm:w-auto"
-                >
-                    <Send className="h-4 w-4 mr-2" /> Solicitar Validação
-                </Button>
+                
+                <div className="flex gap-2">
+                    <Button 
+                        onClick={() => handleStatusChange('AGUARDANDO_VALIDACAO')} 
+                        disabled={isMaturityLow}
+                        className="flex-1"
+                    >
+                        <Send className="h-4 w-4 mr-2" /> Solicitar Validação
+                    </Button>
+                    
+                    {isMaturityLow && canForce && (
+                        <Button 
+                            variant="destructive" 
+                            className="flex-none bg-red-100 text-red-700 hover:bg-red-200 border border-red-200"
+                            onClick={() => setIsForceApprovalOpen(true)}
+                        >
+                            <ShieldAlert className="h-4 w-4 mr-2" /> Forçar Aprovação
+                        </Button>
+                    )}
+                </div>
             </div>
         );
     }
@@ -159,6 +207,37 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
         onClose={() => setIsCorrectionOpen(false)} 
         onConfirm={handleCorrection} 
       />
+
+      <Dialog open={isForceApprovalOpen} onOpenChange={setIsForceApprovalOpen}>
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle className="text-red-700 flex items-center gap-2">
+                    <AlertTriangle className="h-5 w-5" />
+                    Forçar Aprovação
+                </DialogTitle>
+                <DialogDescription>
+                    Você está prestes a aprovar uma operação com <strong>maturidade insuficiente</strong>. 
+                    Esta ação será registrada e requer uma justificativa formal.
+                </DialogDescription>
+            </DialogHeader>
+            <div className="py-4">
+                <label className="text-xs font-bold uppercase text-gray-500 mb-2 block">Justificativa da Decisão</label>
+                <Textarea 
+                    value={justification}
+                    onChange={(e) => setJustification(e.target.value)}
+                    placeholder="Descreva o motivo da aprovação forçada..."
+                    rows={4}
+                    className="bg-red-50 focus:bg-white transition-colors"
+                />
+            </div>
+            <DialogFooter>
+                <Button variant="ghost" onClick={() => setIsForceApprovalOpen(false)}>Cancelar</Button>
+                <Button className="bg-red-600 hover:bg-red-700 text-white" onClick={handleForceApproval}>
+                    Confirmar Aprovação Forçada
+                </Button>
+            </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,61 +1,35 @@
 import { create } from 'zustand';
-
-export interface Notification {
-  id: string;
-  title: string;
-  description: string;
-  type: 'info' | 'warning' | 'error' | 'success';
-  isRead: boolean;
-  createdAt: string;
-}
+import { database, Notification } from '@/services/database';
 
 interface NotificationState {
   notifications: Notification[];
   unreadCount: number;
-  addNotification: (notif: Omit<Notification, 'id' | 'createdAt' | 'isRead'>) => void;
+  refresh: (userId: string, role: string) => void;
   markAsRead: (id: string) => void;
-  markAllAsRead: () => void;
+  markAllAsRead: (userId: string, role: string) => void;
 }
 
 export const useNotificationStore = create<NotificationState>((set) => ({
-  notifications: [
-    {
-      id: '1',
-      title: 'Sistema Ativo',
-      description: 'Bem-vindo ao CPO Digital. O sistema de monitoramento está operando.',
-      type: 'info',
-      isRead: false,
-      createdAt: new Date().toISOString()
-    }
-  ],
-  unreadCount: 1,
-  addNotification: (notif) => set((state) => {
-    const newNotifications = [
-      {
-        ...notif,
-        id: Math.random().toString(36).substr(2, 9),
-        isRead: false,
-        createdAt: new Date().toISOString()
-      },
-      ...state.notifications
-    ];
-    return {
-      notifications: newNotifications,
-      unreadCount: newNotifications.filter(n => !n.isRead).length
-    };
-  }),
-  markAsRead: (id) => set((state) => {
-    const newNotifications = state.notifications.map(n => n.id === id ? { ...n, isRead: true } : n);
-    return {
-      notifications: newNotifications,
-      unreadCount: newNotifications.filter(n => !n.isRead).length
-    };
-  }),
-  markAllAsRead: () => set((state) => {
-    const newNotifications = state.notifications.map(n => ({ ...n, isRead: true }));
-    return {
-      notifications: newNotifications,
+  notifications: [],
+  unreadCount: 0,
+  refresh: (userId, role) => {
+    const notifs = database.getNotifications(userId, role);
+    set({ 
+      notifications: notifs,
+      unreadCount: notifs.filter(n => !n.isRead).length
+    });
+  },
+  markAsRead: (id) => {
+    database.markNotificationAsRead(id);
+    // Note: Caller should refresh or we can try to get userId/role here if we had them
+  },
+  markAllAsRead: (userId, role) => {
+    const all = database.getNotifications(userId, role);
+    all.forEach(n => database.markNotificationAsRead(n.id));
+    const refreshed = database.getNotifications(userId, role);
+    set({ 
+      notifications: refreshed,
       unreadCount: 0
-    };
-  })
+    });
+  }
 }));

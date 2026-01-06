@@ -1,4 +1,4 @@
-export type Role = 
+export type UserRole = 
   | 'admin_master' 
   | 'intelligence_manager' 
   | 'analyst' 
@@ -6,12 +6,30 @@ export type Role =
   | 'planning' 
   | 'management';
 
+export type UserPermission = 
+  | 'VIEW_DASHBOARD'
+  | 'EDIT_OPERATION'
+  | 'APPROVE_WORKFLOW'
+  | 'MANAGE_USERS'
+  | 'VIEW_SENSITIVE_DATA'
+  | 'SELF_MANAGE_CREDENTIALS'
+  | 'EDIT_TARGETS';
+
 export interface User {
   id: string;
   name: string;
-  role: Role;
+  role: UserRole; // Keeping for backward compatibility or primary role
+  roles: UserRole[];
+  permissions: UserPermission[];
   email: string;
+  phone?: string;
+  avatar?: string;
+  linkedOperations?: string[]; // Operation IDs
+  accessMenus?: string[]; // Route paths
 }
+
+// Alias for backward compatibility if needed, though we should prefer UserRole
+export type Role = UserRole;
 
 export type OperationStatus = 
   | 'EM_ANALISE'           
@@ -37,7 +55,8 @@ export interface Target {
   hasCpf: boolean;
   hasPhoto: boolean;
   addresses: Address[];
-  operationId: string;
+  linkedOperationIds: string[]; // Changed from operationId to support multiple links
+  operationId?: string; // Deprecated, keeping for temporary compatibility if needed
   riskLevel: 'LOW' | 'MEDIUM' | 'HIGH' | 'EXTREME';
 }
 

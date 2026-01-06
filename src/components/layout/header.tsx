@@ -1,24 +1,35 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Bell, X, Check, Clock, ShieldAlert, FileText } from "lucide-react";
+import { Search, Bell, X, Check, Clock, ShieldAlert, FileText, LogOut, History, User as UserIcon } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { operationsService } from "@/services/operationsService";
+import { database, AuditLog } from "@/services/database";
 import { Operation } from "@/types";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNotificationStore } from "@/hooks/useNotificationStore";
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 export function Header() {
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState<Operation[]>([]);
   const [showResults, setShowResults] = useState(false);
   const searchRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuthStore();
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore();
+  const { user, logout } = useAuthStore();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, refresh } = useNotificationStore();
+  
+  const [selectedAuditLog, setSelectedAuditLog] = useState<AuditLog | null>(null);
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+        refresh(user.id, user.role);
+    }
+  }, [user, refresh]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -49,6 +60,30 @@ export function Header() {
   const formatTime = (isoString: string) => {
     const date = new Date(isoString);
     return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const handleLogout = () => {
+    logout();
+    window.location.href = "/login";
+  };
+
+  const handleNotificationClick = (notif: any) => {
+    markAsRead(notif.id);
+    if (user) refresh(user.id, user.role);
+
+    if (notif.metadata?.auditLogId && user?.role === 'admin_master') {
+        const log = database.getAuditLogById(notif.metadata.auditLogId);
+        if (log) {
+            setSelectedAuditLog(log);
+            setIsAuditModalOpen(true);
+        }
+    }
+  };
+
+  const handleMarkAllRead = () => {
+    if (user) {
+        markAllAsRead(user.id, user.role);
+    }
   };
 
   return (
@@ -110,7 +145,7 @@ export function Header() {
                 <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50/50">
                     <h3 className="text-sm font-bold text-gov-blue uppercase tracking-tight">Notificações</h3>
                     {unreadCount > 0 && (
-                        <button onClick={markAllAsRead} className="text-[10px] font-bold text-gray-400 hover:text-gov-blue transition-colors">
+                        <button onClick={handleMarkAllRead} className="text-[10px] font-bold text-gray-400 hover:text-gov-blue transition-colors">
                             LIMPAR TUDO
                         </button>
                     )}
@@ -126,17 +161,19 @@ export function Header() {
                                     "px-4 py-3 border-b last:border-0 hover:bg-gray-50 transition-colors relative cursor-pointer",
                                     !notif.isRead && "bg-blue-50/20"
                                 )}
-                                onClick={() => markAsRead(notif.id)}
+                                onClick={() => handleNotificationClick(notif)}
                             >
                                 <div className="flex items-start gap-3">
-                                    {notif.type === 'warning' ? (
+                                    {notif.type === 'WARNING' || notif.type === 'CREDENTIAL_CHANGE_REQUEST' ? (
                                         <ShieldAlert className="h-4 w-4 text-red-600 mt-0.5 shrink-0" />
+                                    ) : notif.metadata?.auditLogId ? (
+                                        <History className="h-4 w-4 text-purple-600 mt-0.5 shrink-0" />
                                     ) : (
                                         <Clock className="h-4 w-4 text-gov-blue mt-0.5 shrink-0" />
                                     )}
                                     <div className="flex-1 overflow-hidden">
                                         <div className="flex justify-between items-center gap-2">
-                                            <h4 className={cn("text-[11px] font-bold uppercase", notif.type === 'warning' ? "text-red-700" : "text-gray-700")}>
+                                            <h4 className={cn("text-[11px] font-bold uppercase", (notif.type === 'WARNING' || notif.type === 'CREDENTIAL_CHANGE_REQUEST') ? "text-red-700" : "text-gray-700")}>
                                                 {notif.title}
                                             </h4>
                                             <span className="text-[9px] text-gray-400 whitespace-nowrap">{formatTime(notif.createdAt)}</span>
@@ -158,7 +195,77 @@ export function Header() {
                 </div>
             </PopoverContent>
         </Popover>
+
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleLogout}
+            className="text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            title="Sair do Sistema"
+        >
+            <LogOut className="h-5 w-5" />
+        </Button>
       </div>
+
+      <Dialog open={isAuditModalOpen} onOpenChange={setIsAuditModalOpen}>
+        <DialogContent className="max-w-2xl bg-white max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 text-gov-blue">
+                    <History className="h-5 w-5" />
+                    Detalhes do Log de Auditoria
+                </DialogTitle>
+            </DialogHeader>
+            {selectedAuditLog && (
+                <div className="space-y-6 py-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm bg-gray-50 p-4 rounded-lg">
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Ação Realizada</p>
+                            <p className="font-bold text-gov-blue">{selectedAuditLog.action}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Data e Hora</p>
+                            <p className="font-medium">{new Date(selectedAuditLog.timestamp).toLocaleString('pt-BR')}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Entidade</p>
+                            <p className="font-medium uppercase">{selectedAuditLog.targetEntity} ({selectedAuditLog.targetId})</p>
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-gray-400 uppercase mb-1">Responsável</p>
+                            <div className="flex items-center gap-1 font-medium">
+                                <UserIcon className="h-3 w-3" />
+                                {selectedAuditLog.actorId}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <p className="text-xs font-bold text-gray-400 uppercase">Detalhamento</p>
+                        <p className="text-sm border-l-4 border-gov-blue pl-3 italic text-gray-600 bg-blue-50/30 py-2">
+                            {selectedAuditLog.details}
+                        </p>
+                    </div>
+
+                    {(selectedAuditLog.oldData || selectedAuditLog.newData) && (
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <p className="text-xs font-bold text-red-500 uppercase">Dados Anteriores</p>
+                                <pre className="text-[10px] bg-red-50 p-3 rounded overflow-x-auto border border-red-100 max-h-40">
+                                    {JSON.stringify(selectedAuditLog.oldData, null, 2)}
+                                </pre>
+                            </div>
+                            <div className="space-y-2">
+                                <p className="text-xs font-bold text-green-600 uppercase">Novos Dados</p>
+                                <pre className="text-[10px] bg-green-50 p-3 rounded overflow-x-auto border border-green-100 max-h-40">
+                                    {JSON.stringify(selectedAuditLog.newData, null, 2)}
+                                </pre>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+        </DialogContent>
+      </Dialog>
     </header>
   );
 }

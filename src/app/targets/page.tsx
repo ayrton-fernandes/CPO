@@ -9,26 +9,31 @@ import { Badge } from "@/components/ui/badge";
 import { User, ShieldAlert, MapPin, Search, Plus, Edit2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { TargetModal } from "@/features/operacoes/components/target-modal";
-import { useNotificationStore } from "@/hooks/useNotificationStore";
 import { Target } from "@/types";
+import { toast } from "sonner";
 
 export default function TargetsPage() {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const { addNotification } = useNotificationStore();
+  const [targets, setTargets] = useState<Target[]>([]);
 
   const operations = operationsService.getAll();
-  
-  const allTargets = useMemo(() => {
-    return operations.flatMap(op => op.targets.map(t => ({ ...t, opTitle: op.title })));
-  }, [operations, refreshKey]);
 
-  const filteredTargets = allTargets.filter(t => 
+  const loadTargets = () => {
+    setTargets(operationsService.getAllTargets());
+  };
+
+  useEffect(() => {
+    if (isAuthenticated) {
+        loadTargets();
+    }
+  }, [isAuthenticated]);
+
+  const filteredTargets = targets.filter(t => 
     t.name.toLowerCase().includes(search.toLowerCase()) || 
     t.nickname.toLowerCase().includes(search.toLowerCase()) ||
     t.cpf.includes(search)
@@ -45,31 +50,20 @@ export default function TargetsPage() {
   };
 
   const handleSaveTarget = (targetData: Target) => {
-    const op = operationsService.getById(targetData.operationId);
-    if (op) {
-      let updatedTargets;
-      if (selectedTarget) {
-        // Update existing target in its operation
-        updatedTargets = op.targets.map(t => t.id === targetData.id ? targetData : t);
-        addNotification({
-          title: "Alvo Atualizado",
-          description: `"${targetData.name}" foi atualizado no banco de dados.`,
-          type: 'success'
-        });
-      } else {
-        // Add new target
-        updatedTargets = [...op.targets, targetData];
-        addNotification({
-          title: "Alvo Cadastrado",
-          description: `"${targetData.name}" foi adicionado ao banco e vinculado à ${op.title}.`,
-          type: 'success'
-        });
-      }
-      
-      operationsService.updateTargets(op.id, updatedTargets);
-      setRefreshKey(prev => prev + 1);
+    try {
+        operationsService.saveTarget(targetData);
+        toast.success(selectedTarget ? "Alvo atualizado com sucesso" : "Alvo cadastrado com sucesso");
+        loadTargets();
+        setIsModalOpen(false);
+    } catch (error) {
+        toast.error("Erro ao salvar alvo");
     }
-    setIsModalOpen(false);
+  };
+
+  const getTargetOpTitle = (target: Target) => {
+    if (!target.linkedOperationIds || target.linkedOperationIds.length === 0) return "SEM VÍNCULO";
+    const op = operationsService.getById(target.linkedOperationIds[0]);
+    return op ? op.title : "OPERAÇÃO DESCONHECIDA";
   };
 
   if (!isAuthenticated) return null;
@@ -101,7 +95,7 @@ export default function TargetsPage() {
 
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {filteredTargets.map((target) => (
-                <Card key={`${target.id}-${target.operationId}`} className="hover:shadow-md transition-shadow border-l-4 border-l-gov-blue">
+                <Card key={target.id} className="hover:shadow-md transition-shadow border-l-4 border-l-gov-blue">
                     <CardHeader className="pb-2">
                         <div className="flex justify-between items-start">
                             <div className="flex items-center gap-3">
@@ -120,7 +114,7 @@ export default function TargetsPage() {
                                 </div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTarget(target as any)}>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTarget(target)}>
                                     <Edit2 className="h-4 w-4" />
                                 </Button>
                                 <Badge variant={target.riskLevel === 'EXTREME' || target.riskLevel === 'HIGH' ? 'destructive' : 'default'} className="text-[10px]">
@@ -139,7 +133,7 @@ export default function TargetsPage() {
                         <div className="pt-2 border-t text-[10px] text-gray-400 flex justify-between items-center">
                             <span>VINCULADO À:</span>
                             <Badge variant="outline" className="text-[9px] font-bold text-gray-600 bg-gray-50">
-                                {target.opTitle}
+                                {getTargetOpTitle(target)}
                             </Badge>
                         </div>
                     </CardContent>
@@ -147,15 +141,12 @@ export default function TargetsPage() {
             ))}
         </div>
 
-        {operations.length > 0 && (
-            <TargetModal 
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSave={handleSaveTarget}
-                initialData={selectedTarget}
-                operationId={selectedTarget?.operationId || operations[0].id}
-            />
-        )}
+        <TargetModal 
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onSave={handleSaveTarget}
+            initialData={selectedTarget}
+        />
       </PageContainer>
     </div>
   );

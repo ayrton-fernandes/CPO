@@ -1,60 +1,113 @@
-import { Operation, OperationStatus, Target, OperationReport, OperationDocument } from "@/types";
-import { MOCK_OPERATIONS, calculateMaturity } from "./mockData";
-
-let currentOperations = [...MOCK_OPERATIONS];
+import { Operation, OperationStatus, Target } from "@/types";
+import { database } from "./database";
+import { calculateMaturity } from "./mockData";
 
 export const operationsService = {
   getById: (id: string): Operation | undefined => {
-    return currentOperations.find(op => op.id === id);
+    return database.getOperationById(id);
   },
 
-  getAll: () => currentOperations,
+  getAll: () => database.getOperations(),
+
+  getAllTargets: (): Target[] => {
+    return database.getTargets();
+  },
+
+  // Save target (Create or Update)
+  saveTarget: (target: Target): void => {
+    const oldTarget = database.getTargets().find(t => t.id === target.id);
+    
+    // If target has operationId (legacy/single context) but not linkedOperationIds, fix it
+    if (target.operationId && (!target.linkedOperationIds || target.linkedOperationIds.length === 0)) {
+        target.linkedOperationIds = [target.operationId];
+    }
+
+    database.saveTarget(target);
+
+    // Audit Log
+    database.addAuditLog({
+        actorId: "SISTEMA", // Idealmente pegar do store de auth, mas service não tem acesso direto fácil sem passar como param
+        action: oldTarget ? "ATUALIZAÇÃO DE ALVO" : "CRIAÇÃO DE ALVO",
+        targetEntity: "TARGET",
+        targetId: target.id,
+        details: `${oldTarget ? "Editou" : "Criou"} o alvo ${target.name} (${target.nickname})`,
+        timestamp: new Date().toISOString(),
+        oldData: oldTarget,
+        newData: target
+    });
+  },
 
   updateStatus: (id: string, newStatus: OperationStatus): Operation | undefined => {
-    const opIndex = currentOperations.findIndex(op => op.id === id);
-    if (opIndex === -1) return undefined;
+    const op = database.getOperationById(id);
+    if (!op) return undefined;
 
+    const oldStatus = op.status;
     const updatedOp = {
-      ...currentOperations[opIndex],
+      ...op,
       status: newStatus,
       updatedAt: new Date().toISOString(),
     };
 
-    currentOperations[opIndex] = updatedOp;
+    database.saveOperation(updatedOp);
+
+    database.addAuditLog({
+        actorId: "SISTEMA",
+        action: "ALTERAÇÃO DE STATUS",
+        targetEntity: "OPERATION",
+        targetId: id,
+        details: `Alterou status da operação "${op.title}" de ${oldStatus} para ${newStatus}`,
+        timestamp: new Date().toISOString(),
+        oldData: { status: oldStatus },
+        newData: { status: newStatus }
+    });
+
     return updatedOp;
   },
 
   updateOperation: (id: string, data: Partial<Operation>): Operation | undefined => {
-    const opIndex = currentOperations.findIndex(op => op.id === id);
-    if (opIndex === -1) return undefined;
+    const op = database.getOperationById(id);
+    if (!op) return undefined;
 
     const updatedOp = {
-      ...currentOperations[opIndex],
+      ...op,
       ...data,
       updatedAt: new Date().toISOString(),
     };
 
-    currentOperations[opIndex] = updatedOp;
+    database.saveOperation(updatedOp);
     return updatedOp;
   },
 
   updateTargets: (id: string, targets: Target[]): Operation | undefined => {
-    const opIndex = currentOperations.findIndex(op => op.id === id);
-    if (opIndex === -1) return undefined;
+    // This method is tricky with the new DB structure because targets are central.
+    // If we update the operation's target list directly, we might miss updating the central target store.
+    // Best approach: Iterate and save each target via database.
+    
+    const op = database.getOperationById(id);
+    if (!op) return undefined;
 
+    // Save each target to DB (which triggers sync)
+    targets.forEach(t => {
+        if (!t.linkedOperationIds.includes(id)) {
+            t.linkedOperationIds.push(id);
+        }
+        database.saveTarget(t);
+    });
+
+    // Recalculate maturity
     const updatedOp = {
-      ...currentOperations[opIndex],
-      targets: targets,
-      maturity: calculateMaturity(targets),
-      updatedAt: new Date().toISOString(),
+        ...op,
+        maturity: calculateMaturity(targets),
+        updatedAt: new Date().toISOString()
     };
+    database.saveOperation(updatedOp);
 
-    currentOperations[opIndex] = updatedOp;
     return updatedOp;
   },
 
   checkTargetConflict: (targetCpf: string, targetNickname: string, currentOpId: string) => {
-    for (const op of currentOperations) {
+    const operations = database.getOperations();
+    for (const op of operations) {
       if (op.id === currentOpId) continue;
       const conflict = op.targets.find(t => 
         (t.hasCpf && t.cpf === targetCpf) || 
@@ -67,20 +120,7 @@ export const operationsService = {
 
   create: (data: any): Operation => {
     const newId = `op-${Date.now()}`;
-    const newOp: Operation = {
-      id: newId,
-      title: data.title,
-      description: data.description,
-      priority: data.priority,
-      location: data.location,
-      department: data.department,
-      status: 'EM_ANALISE',
-      maturity: 0,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      createdBy: data.createdBy,
-      assignedAgents: [],
-      targets: (data.targets || []).map((name: string) => ({
+    const newTargets = (data.targets || []).map((name: string) => ({
         id: `t-${Math.random().toString(36).substr(2, 9)}`,
         name: name,
         nickname: "",
@@ -89,20 +129,39 @@ export const operationsService = {
         hasPhoto: false,
         riskLevel: 'MEDIUM',
         operationId: newId,
+        linkedOperationIds: [newId], // Critical for new DB
         addresses: [],
-      })),
+    }));
+
+    const newOp: Operation = {
+      id: newId,
+      title: data.title,
+      description: data.description,
+      priority: data.priority,
+      location: data.location,
+      department: data.department,
+      status: 'EM_ANALISE',
+      maturity: calculateMaturity(newTargets),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      createdBy: data.createdBy,
+      assignedAgents: data.assignedAgents || [],
+      targets: newTargets,
       documents: [],
       reports: [],
       validationHistory: [],
     };
     
-    newOp.maturity = calculateMaturity(newOp.targets);
-    currentOperations.unshift(newOp);
+    // Save targets first
+    newTargets.forEach((t: Target) => database.saveTarget(t));
+    
+    // Save Op
+    database.saveOperation(newOp);
     return newOp;
   },
 
   resetData: () => {
-    currentOperations = [...MOCK_OPERATIONS];
-    return currentOperations;
+    database.reset();
+    return database.getOperations();
   }
 };

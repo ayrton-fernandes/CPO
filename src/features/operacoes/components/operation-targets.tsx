@@ -5,11 +5,14 @@ import { Operation, Target } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { User, MapPin, Plus, Edit2, Camera, ShieldCheck, AlertCircle } from "lucide-react";
+import { User, MapPin, Plus, Edit2, Camera, ShieldCheck, AlertCircle, Unlink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TargetModal } from "./target-modal";
+import { TargetSearchModal } from "./target-search-modal";
 import { operationsService } from "@/services/operationsService";
 import { useNotificationStore } from "@/hooks/useNotificationStore";
+import { useAuthStore } from "@/hooks/useAuthStore";
+import { toast } from "sonner";
 
 interface OperationTargetsProps {
   operation: Operation;
@@ -18,12 +21,37 @@ interface OperationTargetsProps {
 
 export function OperationTargets({ operation, onUpdate }: OperationTargetsProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
-  const { addNotification } = useNotificationStore();
+  const { user } = useAuthStore();
 
   const handleAddTarget = () => {
     setSelectedTarget(null);
+    setIsSearchModalOpen(true);
+  };
+
+  const handleCreateNew = () => {
+    setIsSearchModalOpen(false);
+    setSelectedTarget(null);
     setIsModalOpen(true);
+  };
+
+  const handleSelectFromSearch = (target: Target) => {
+    // Link existing target to this operation
+    const currentLinks = target.linkedOperationIds || [];
+    if (!currentLinks.includes(operation.id)) {
+        currentLinks.push(operation.id);
+    }
+    
+    const linkedTarget = { ...target, linkedOperationIds: currentLinks };
+    operationsService.saveTarget(linkedTarget);
+    
+    toast.success("Alvo Vinculado", {
+        description: `"${target.nickname || target.name}" foi vinculado a esta investigação.`
+    });
+    
+    setIsSearchModalOpen(false);
+    onUpdate();
   };
 
   const handleEditTarget = (target: Target) => {
@@ -32,29 +60,35 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
   };
 
   const handleSaveTarget = (targetData: Target) => {
-    let updatedTargets;
+    // Save (Create or Update) via service
+    operationsService.saveTarget(targetData);
+
     if (selectedTarget) {
-      // Edit
-      updatedTargets = operation.targets.map(t => t.id === targetData.id ? targetData : t);
-      addNotification({
-        title: "Alvo Atualizado",
-        description: `Os dados de "${targetData.nickname || targetData.name}" foram atualizados.`,
-        type: 'success'
+      toast.success("Alvo Atualizado", {
+        description: `Os dados de "${targetData.nickname || targetData.name}" foram atualizados.`
       });
     } else {
-      // Add new
-      updatedTargets = [...operation.targets, targetData];
-      addNotification({
-        title: "Alvo Vinculado",
-        description: `"${targetData.nickname || targetData.name}" foi adicionado à investigação.`,
-        type: 'success'
+      toast.success("Alvo Criado", {
+        description: `"${targetData.nickname || targetData.name}" foi criado e vinculado.`
       });
     }
 
-    operationsService.updateTargets(operation.id, updatedTargets);
     onUpdate();
     setIsModalOpen(false);
   };
+
+  const handleUnlinkTarget = (target: Target) => {
+    if (confirm(`Tem certeza que deseja desvincular "${target.name}" desta operação? O alvo permanecerá no banco global.`)) {
+        const updatedLinks = (target.linkedOperationIds || []).filter(id => id !== operation.id);
+        const unlinkedTarget = { ...target, linkedOperationIds: updatedLinks };
+        
+        operationsService.saveTarget(unlinkedTarget);
+        toast.success("Alvo desvinculado com sucesso.");
+        onUpdate();
+    }
+  };
+
+  const canUnlink = user?.role === 'admin_master' || user?.role === 'intelligence_manager';
 
   return (
     <div className="space-y-6">
@@ -94,9 +128,16 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
                             </Badge>
                         </div>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={() => handleEditTarget(target)}>
-                        <Edit2 className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                        <Button variant="ghost" size="icon" onClick={() => handleEditTarget(target)} title="Editar Dados">
+                            <Edit2 className="h-4 w-4" />
+                        </Button>
+                        {canUnlink && (
+                             <Button variant="ghost" size="icon" onClick={() => handleUnlinkTarget(target)} className="text-red-500 hover:text-red-700 hover:bg-red-50" title="Desvincular da Operação">
+                                <Unlink className="h-4 w-4" />
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 <div className="mt-4 grid grid-cols-2 gap-2 text-[11px] font-medium uppercase tracking-wider">
@@ -130,6 +171,13 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
           </Card>
         ))}
       </div>
+
+      <TargetSearchModal 
+        isOpen={isSearchModalOpen}
+        onClose={() => setIsSearchModalOpen(false)}
+        onSelectTarget={handleSelectFromSearch}
+        onCreateNew={handleCreateNew}
+      />
 
       <TargetModal 
         isOpen={isModalOpen}

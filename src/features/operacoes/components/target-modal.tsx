@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, MapPin, ShieldAlert } from "lucide-react";
 import { operationsService } from "@/services/operationsService";
-import { useNotificationStore } from "@/hooks/useNotificationStore";
+import { toast } from "sonner";
 
 const targetSchema = z.object({
   name: z.string().min(3, "Nome é obrigatório"),
@@ -30,39 +30,54 @@ const targetSchema = z.object({
 
 type TargetFormValues = z.infer<typeof targetSchema>;
 
+const extendedTargetSchema = targetSchema.extend({
+  linkedOperationIds: z.array(z.string())
+});
+
+type ExtendedTargetFormValues = z.infer<typeof extendedTargetSchema>;
+
 interface TargetModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (data: Target) => void;
   initialData?: Target | null;
-  operationId: string;
+  operationId?: string; // Optional: If provided, acts as Local Context
 }
 
 export function TargetModal({ isOpen, onClose, onSave, initialData, operationId }: TargetModalProps) {
   const [conflictOp, setConflictOp] = useState<any>(null);
-  const { addNotification } = useNotificationStore();
-  const [selectedOpId, setSelectedOpId] = useState(operationId);
   const operations = operationsService.getAll();
+  const isLocalContext = !!operationId;
   
-  const { register, control, handleSubmit, watch, reset, formState: { errors } } = useForm<TargetFormValues>({
-    resolver: zodResolver(targetSchema),
+  const { register, control, handleSubmit, watch, reset, setValue, getValues, formState: { errors } } = useForm<ExtendedTargetFormValues>({
+    resolver: zodResolver(extendedTargetSchema),
     defaultValues: {
       name: "",
       nickname: "",
       cpf: "",
       hasPhoto: false,
       periculosidade: "MEDIUM",
-      addresses: [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }]
+      addresses: [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }],
+      linkedOperationIds: []
     }
   });
 
   useEffect(() => {
-    setSelectedOpId(operationId);
-  }, [operationId]);
-
-  useEffect(() => {
     if (isOpen) {
       if (initialData) {
+        // Prepare linkedOperationIds
+        let initialLinks = initialData.linkedOperationIds || [];
+        
+        // Backward compatibility or if coming from legacy data
+        if (initialLinks.length === 0 && initialData.operationId) {
+            initialLinks = [initialData.operationId];
+        }
+
+        // If local context, ensure we are tracking it (though we won't show the selector)
+        if (isLocalContext && operationId && !initialLinks.includes(operationId)) {
+            initialLinks.push(operationId);
+        }
+
         reset({
           name: initialData.name,
           nickname: initialData.nickname || "",
@@ -78,23 +93,27 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
                 city: a.city,
                 isConfirmed: a.isConfirmed
             }))
-            : [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }]
+            : [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }],
+          linkedOperationIds: initialLinks
         });
       } else {
+        // New Target
         reset({
           name: "",
           nickname: "",
           cpf: "",
           hasPhoto: false,
           periculosidade: "MEDIUM",
-          addresses: [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }]
+          addresses: [{ label: "Residência", street: "", number: "", neighborhood: "", city: "Recife", isConfirmed: false }],
+          linkedOperationIds: isLocalContext && operationId ? [operationId] : []
         });
       }
     }
-  }, [isOpen, initialData, reset]);
+  }, [isOpen, initialData, reset, operationId, isLocalContext]);
 
   const nicknameValue = watch("nickname");
   const cpfValue = watch("cpf");
+  const currentLinkedOps = watch("linkedOperationIds");
 
   function cpfCpfClean(cpf?: string) {
     return cpf?.replace(/\D/g, "");
@@ -108,24 +127,42 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
     }
 
     const timer = setTimeout(() => {
-      const conflict = operationsService.checkTargetConflict(cpfCpfClean(cpfValue) || "", nicknameValue || "", selectedOpId);
-      setConflictOp(conflict);
-      
-      if (conflict) {
-        addNotification({
-          title: "CONFLITO DE INVESTIGAÇÃO",
-          description: `Alvo "${nicknameValue || cpfValue}" está sendo investigado simultaneamente na ${conflict.title}.`,
-          type: 'warning'
-        });
-      }
+        // Only check conflict if we have linked operations? Or check global?
+        // Service expects currentOpId to exclude from check.
+        // For now, let's use the first linked op as "current" or skip exclusion if none.
+        const currentOpCheck = currentLinkedOps && currentLinkedOps.length > 0 ? currentLinkedOps[0] : "";
+        
+        const conflict = operationsService.checkTargetConflict(cpfCpfClean(cpfValue) || "", nicknameValue || "", currentOpCheck);
+        setConflictOp(conflict);
+        
+        if (conflict) {
+            toast.warning("CONFLITO DE INVESTIGAÇÃO", {
+                description: `Alvo "${nicknameValue || cpfValue}" está sendo investigado simultaneamente na ${conflict.title}.`
+            });
+        }
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [nicknameValue, cpfValue, selectedOpId, addNotification]);
+  }, [nicknameValue, cpfValue, currentLinkedOps]);
 
   const { fields, append, remove } = useFieldArray({ control, name: "addresses" });
 
-  const onSubmit = (values: TargetFormValues) => {
+  const toggleOperationLink = (opId: string) => {
+    const current = getValues("linkedOperationIds") || [];
+    if (current.includes(opId)) {
+        setValue("linkedOperationIds", current.filter(id => id !== opId));
+    } else {
+        setValue("linkedOperationIds", [...current, opId]);
+    }
+  };
+
+  const onSubmit = (values: ExtendedTargetFormValues) => {
+    // Ensure local context op is linked
+    let finalLinks = values.linkedOperationIds || [];
+    if (isLocalContext && operationId && !finalLinks.includes(operationId)) {
+        finalLinks.push(operationId);
+    }
+
     const formattedTargets: Target = {
       id: initialData?.id || `target-${Date.now()}`,
       name: values.name,
@@ -134,7 +171,9 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
       hasCpf: !!values.cpf,
       hasPhoto: values.hasPhoto,
       riskLevel: values.periculosidade,
-      operationId: selectedOpId,
+      linkedOperationIds: finalLinks,
+      // Keep legacy for now just in case
+      operationId: finalLinks.length > 0 ? finalLinks[0] : "",
       addresses: values.addresses.map((a, idx) => ({
           id: initialData?.addresses[idx]?.id || `addr-${Date.now()}-${idx}`,
           street: a.street,
@@ -155,18 +194,25 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
         </DialogHeader>
         
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {!initialData && (
-            <div className="space-y-1">
-              <label className="text-sm font-bold text-gov-blue">Vincular à Operação</label>
-              <select 
-                value={selectedOpId}
-                onChange={(e) => setSelectedOpId(e.target.value)}
-                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
+          
+          {/* Show Multi-Select ONLY if NOT Local Context (Global Context) */}
+          {!isLocalContext && (
+            <div className="space-y-2 border p-3 rounded-md bg-gray-50">
+              <label className="text-sm font-bold text-gov-blue block">Vincular às Operações (Opcional)</label>
+              <div className="max-h-32 overflow-y-auto space-y-1">
                 {operations.map(op => (
-                  <option key={op.id} value={op.id}>{op.title} ({op.department})</option>
+                  <label key={op.id} className="flex items-center space-x-2 text-sm cursor-pointer hover:bg-gray-100 p-1 rounded">
+                    <input 
+                        type="checkbox" 
+                        value={op.id}
+                        checked={currentLinkedOps?.includes(op.id)}
+                        onChange={() => toggleOperationLink(op.id)}
+                        className="rounded border-gray-300 text-gov-blue focus:ring-gov-blue"
+                    />
+                    <span>{op.title} <span className="text-xs text-gray-500">({op.department})</span></span>
+                  </label>
                 ))}
-              </select>
+              </div>
             </div>
           )}
 

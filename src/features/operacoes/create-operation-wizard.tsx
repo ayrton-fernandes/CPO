@@ -1,18 +1,20 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useForm, useFieldArray } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
 import { useRouter } from "next/navigation"
 import { toast } from "sonner"
-import { Loader2, Plus, Trash2, ArrowRight, ArrowLeft, Upload, File } from "lucide-react"
+import { Loader2, Plus, Trash2, ArrowRight, ArrowLeft, Upload, File, Users } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
 import { operationsService } from "@/services/operationsService"
+import { usersService } from "@/services/usersService"
 import { useAuthStore } from "@/hooks/useAuthStore"
+import { User } from "@/types"
 
 const formSchema = z.object({
   title: z.string().min(3, "Título deve ter pelo menos 3 caracteres"),
@@ -23,6 +25,7 @@ const formSchema = z.object({
   targets: z.array(z.object({
     name: z.string().min(1, "Nome do alvo é obrigatório")
   })).min(1, "Adicione pelo menos um alvo"),
+  assignedAgents: z.array(z.string()).optional(),
 })
 
 type FormValues = z.infer<typeof formSchema>
@@ -33,6 +36,7 @@ export function CreateOperationWizard() {
   const [step, setStep] = useState(1)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]) // Simulated files
+  const [availableUsers, setAvailableUsers] = useState<User[]>([])
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -42,7 +46,8 @@ export function CreateOperationWizard() {
       priority: "MEDIUM",
       location: "",
       department: "",
-      targets: [{ name: "" }]
+      targets: [{ name: "" }],
+      assignedAgents: []
     },
     mode: "onChange"
   })
@@ -52,12 +57,20 @@ export function CreateOperationWizard() {
     name: "targets"
   })
 
+  useEffect(() => {
+    // Load users for the team selection step
+    const users = usersService.getAll();
+    setAvailableUsers(users);
+  }, []);
+
   const handleNext = async () => {
     let isValid = false;
     if (step === 1) {
         isValid = await form.trigger(["title", "description", "priority", "location", "department"]);
     } else if (step === 2) {
         isValid = await form.trigger("targets");
+    } else if (step === 3) {
+        isValid = true; // Selection is optional
     }
     
     if (isValid) setStep(prev => prev + 1);
@@ -78,7 +91,8 @@ export function CreateOperationWizard() {
             location: data.location,
             department: data.department,
             createdBy: user.id,
-            targets: data.targets.map(t => t.name)
+            targets: data.targets.map(t => t.name),
+            assignedAgents: data.assignedAgents || []
         };
 
         // Simulate network delay
@@ -104,12 +118,21 @@ export function CreateOperationWizard() {
      toast.success("Documento anexado (simulado)");
   }
 
+  const toggleAgent = (userId: string) => {
+    const currentAgents = form.getValues("assignedAgents") || [];
+    if (currentAgents.includes(userId)) {
+        form.setValue("assignedAgents", currentAgents.filter(id => id !== userId));
+    } else {
+        form.setValue("assignedAgents", [...currentAgents, userId]);
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto">
         <div className="mb-8">
             <div className="flex items-center justify-between relative">
                 <div className="absolute left-0 top-1/2 w-full h-1 bg-gray-200 -z-10" />
-                {[1, 2, 3].map((s) => (
+                {[1, 2, 3, 4].map((s) => (
                     <div 
                         key={s} 
                         className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm border-2 bg-white transition-colors
@@ -122,9 +145,10 @@ export function CreateOperationWizard() {
                 ))}
             </div>
             <div className="flex justify-between mt-2 text-xs font-medium text-gray-500">
-                <span>Dados Básicos</span>
+                <span>Dados</span>
+                <span>Equipe</span>
                 <span>Alvos</span>
-                <span>Anexos & Revisão</span>
+                <span>Revisão</span>
             </div>
         </div>
 
@@ -133,12 +157,14 @@ export function CreateOperationWizard() {
                 <CardTitle>
                     {step === 1 && "Informações da Operação"}
                     {step === 2 && "Definição de Alvos"}
-                    {step === 3 && "Anexos e Revisão"}
+                    {step === 3 && "Equipe Envolvida"}
+                    {step === 4 && "Anexos e Revisão"}
                 </CardTitle>
                 <CardDescription>
                     {step === 1 && "Preencha os dados iniciais para registrar a demanda."}
                     {step === 2 && "Identifique os alvos ou grupos investigados."}
-                    {step === 3 && "Adicione documentos iniciais e confirme a criação."}
+                    {step === 3 && "Selecione os agentes que farão parte da operação."}
+                    {step === 4 && "Adicione documentos iniciais e confirme a criação."}
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -181,7 +207,7 @@ export function CreateOperationWizard() {
                     </div>
                 )}
 
-                {step === 2 && (
+                {step === 3 && (
                     <div className="space-y-4">
                         <div className="space-y-2">
                             {fields.map((field, index) => (
@@ -214,7 +240,44 @@ export function CreateOperationWizard() {
                     </div>
                 )}
 
-                {step === 3 && (
+                {step === 2 && (
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 mb-2 text-sm text-gray-500">
+                            <Users className="h-4 w-4" />
+                            Selecione os agentes disponíveis para esta operação:
+                        </div>
+                        <div className="max-h-[300px] overflow-y-auto border rounded-md p-2 space-y-1">
+                            {availableUsers.map((u) => (
+                                <div 
+                                    key={u.id} 
+                                    className={`flex items-center p-2 rounded cursor-pointer transition-colors ${
+                                        form.watch("assignedAgents")?.includes(u.id) 
+                                            ? "bg-blue-50 border-blue-200" 
+                                            : "hover:bg-gray-50"
+                                    }`}
+                                    onClick={() => toggleAgent(u.id)}
+                                >
+                                    <div className={`w-4 h-4 border rounded mr-3 flex items-center justify-center ${
+                                        form.watch("assignedAgents")?.includes(u.id) 
+                                            ? "bg-gov-blue border-gov-blue" 
+                                            : "border-gray-300"
+                                    }`}>
+                                        {form.watch("assignedAgents")?.includes(u.id) && <span className="text-white text-[10px]">✓</span>}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium">{u.name}</span>
+                                        <span className="text-xs text-gray-500 capitalize">{u.role?.replace('_', ' ')}</span>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <p className="text-xs text-gray-400 text-center">
+                            Selecionados: {form.watch("assignedAgents")?.length || 0}
+                        </p>
+                    </div>
+                )}
+
+                {step === 4 && (
                     <div className="space-y-6">
                         <div className="border-2 border-dashed border-gray-200 rounded-lg p-6 flex flex-col items-center justify-center text-center hover:bg-gray-50 transition-colors cursor-pointer" onClick={handleFileUpload}>
                             <div className="h-10 w-10 bg-blue-50 rounded-full flex items-center justify-center mb-3">
@@ -240,6 +303,7 @@ export function CreateOperationWizard() {
                             <h4 className="font-semibold text-gov-blue mb-2">Resumo:</h4>
                             <p className="text-sm text-gray-700"><strong>Operação:</strong> {form.getValues("title")}</p>
                             <p className="text-sm text-gray-700"><strong>Alvos:</strong> {form.getValues("targets").length}</p>
+                            <p className="text-sm text-gray-700"><strong>Equipe:</strong> {form.getValues("assignedAgents")?.length || 0} agentes</p>
                             <p className="text-sm text-gray-700"><strong>Prioridade:</strong> {form.getValues("priority")}</p>
                         </div>
                     </div>
@@ -250,7 +314,7 @@ export function CreateOperationWizard() {
                     <ArrowLeft className="mr-2 h-4 w-4" /> Voltar
                 </Button>
                 
-                {step < 3 ? (
+                {step < 4 ? (
                     <Button onClick={handleNext}>
                         Próximo <ArrowRight className="ml-2 h-4 w-4" />
                     </Button>
