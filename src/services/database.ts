@@ -114,6 +114,7 @@ class DatabaseService {
 
   // Users
   getUsers(): User[] { return this.get<User>(STORAGE_KEYS.USERS); }
+  getUserById(id: string): User | undefined { return this.getUsers().find(u => u.id === id); }
   saveUser(user: User) {
     const users = this.getUsers();
     const index = users.findIndex(u => u.id === user.id);
@@ -127,12 +128,21 @@ class DatabaseService {
   }
 
   // Operations
-  getOperations(): Operation[] { return this.get<Operation>(STORAGE_KEYS.OPERATIONS); }
+  getOperations(userId?: string, role?: string): Operation[] { 
+    const allOps = this.get<Operation>(STORAGE_KEYS.OPERATIONS);
+    if (!userId || role === 'admin_master') return allOps;
+    
+    // Non-master users see only operations they are linked to
+    return allOps.filter(op => 
+        op.assignedAgents.includes(userId) || 
+        (this.getUserById(userId)?.linkedOperations?.includes(op.id))
+    );
+  }
   getOperationById(id: string): Operation | undefined {
-    return this.getOperations().find(op => op.id === id);
+    return this.get<Operation>(STORAGE_KEYS.OPERATIONS).find(op => op.id === id);
   }
   saveOperation(op: Operation) {
-    const ops = this.getOperations();
+    const ops = this.get<Operation>(STORAGE_KEYS.OPERATIONS);
     const index = ops.findIndex(o => o.id === op.id);
     if (index >= 0) ops[index] = op;
     else ops.push(op);
@@ -158,7 +168,7 @@ class DatabaseService {
 
   // Helper to update the embedded targets inside operations whenever a target changes
   private syncTargetToOperations(target: Target) {
-    const ops = this.getOperations();
+    const ops = this.get<Operation>(STORAGE_KEYS.OPERATIONS);
     let opsChanged = false;
 
     // Remove target from operations it is NOT linked to anymore
@@ -188,33 +198,66 @@ class DatabaseService {
 
   // Messages
   getMessages(userId: string): Message[] {
-    // Return messages where recipient is User OR recipient is an Operation the user is in
     const allMessages = this.get<Message>(STORAGE_KEYS.MESSAGES);
-    const user = this.getUsers().find(u => u.id === userId);
-    if (!user) return [];
-
-    return allMessages.filter(msg => {
-      if (msg.recipientId === userId) return true;
-      if (msg.recipientOperationId && user.linkedOperations?.includes(msg.recipientOperationId)) return true;
-      return false;
+    // Use a Map to ensure uniqueness by ID
+    const uniqueMessages = new Map<string, Message>();
+    
+    allMessages.forEach(msg => {
+      if (msg.recipientId === userId) {
+        uniqueMessages.set(msg.id, msg);
+      }
     });
+
+    return Array.from(uniqueMessages.values()).sort((a, b) => 
+      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
   }
   
-  sendMessage(msg: Message) {
+  sendMessage(payload: { 
+    senderId: string; 
+    recipientIds: string[]; 
+    operationIds: string[]; 
+    subject: string; 
+    content: string; 
+  }) {
     const msgs = this.get<Message>(STORAGE_KEYS.MESSAGES);
-    if (msg.recipientOperationId) {
-      // Broadcast to all users in the operation
-      const op = this.getOperationById(msg.recipientOperationId);
+    const targetUserIds = new Set<string>(payload.recipientIds);
+
+    // Expand operations
+    payload.operationIds.forEach(opId => {
+      const op = this.getOperationById(opId);
       if (op) {
-        op.assignedAgents.forEach(agentId => {
-          const newMsg = { ...msg, id: `msg-${Date.now()}-${agentId}`, recipientId: agentId };
-          msgs.push(newMsg);
-        });
+        op.assignedAgents.forEach(agentId => targetUserIds.add(agentId));
       }
-    } else {
-      msgs.push(msg);
-    }
+    });
+
+    // Create a message for each unique user
+    const timestamp = new Date().toISOString();
+    const baseId = Date.now();
+
+    targetUserIds.forEach(userId => {
+      const newMsg: Message = {
+        id: `msg-${baseId}-${userId}`,
+        senderId: payload.senderId,
+        recipientId: userId,
+        subject: payload.subject,
+        content: payload.content,
+        createdAt: timestamp,
+        isRead: false
+      };
+      msgs.push(newMsg);
+    });
+
     this.save(STORAGE_KEYS.MESSAGES, msgs);
+  }
+
+  markMessageAsRead(messageId: string) {
+    const msgs = this.get<Message>(STORAGE_KEYS.MESSAGES);
+    const index = msgs.findIndex(m => m.id === messageId);
+    if (index >= 0) {
+        msgs[index].isRead = true;
+        this.save(STORAGE_KEYS.MESSAGES, msgs);
+    }
   }
 
   // Notifications

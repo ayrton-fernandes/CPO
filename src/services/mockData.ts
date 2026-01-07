@@ -7,7 +7,7 @@ export const MOCK_USERS: User[] = [
     email: "master@policia.pe.gov.br", 
     role: "admin_master",
     roles: ["admin_master"],
-    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION", "APPROVE_WORKFLOW", "MANAGE_USERS", "VIEW_SENSITIVE_DATA"],
+    permissions: ["APPROVE_WORKFLOWS", "EDIT_OPERATIONS", "MANAGE_CREDENTIALS", "EDIT_GLOBAL_TARGETS"],
     accessMenus: ["/dashboard", "/operations", "/targets", "/validations", "/reports", "/map", "/indicators", "/users"],
     linkedOperations: [] // Admin sees all usually, but this is explicit
   },
@@ -17,7 +17,7 @@ export const MOCK_USERS: User[] = [
     email: "gerente@policia.pe.gov.br", 
     role: "intelligence_manager",
     roles: ["intelligence_manager"],
-    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION", "APPROVE_WORKFLOW", "VIEW_SENSITIVE_DATA"],
+    permissions: ["APPROVE_WORKFLOWS", "EDIT_OPERATIONS", "MANAGE_CREDENTIALS"],
     accessMenus: ["/dashboard", "/operations", "/targets", "/map", "/users"],
     linkedOperations: ["op-001", "op-002"]
   },
@@ -27,7 +27,7 @@ export const MOCK_USERS: User[] = [
     email: "analista@policia.pe.gov.br", 
     role: "analyst",
     roles: ["analyst"],
-    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION"],
+    permissions: ["EDIT_OPERATIONS", "EDIT_GLOBAL_TARGETS"],
     accessMenus: ["/dashboard", "/operations", "/targets", "/reports", "/map"],
     linkedOperations: ["op-001"]
   },
@@ -37,7 +37,7 @@ export const MOCK_USERS: User[] = [
     email: "investigador@policia.pe.gov.br", 
     role: "investigator",
     roles: ["investigator"],
-    permissions: ["VIEW_DASHBOARD", "EDIT_OPERATION"],
+    permissions: ["EDIT_OPERATIONS"],
     accessMenus: ["/dashboard", "/operations", "/reports"],
     linkedOperations: ["op-001", "op-002"]
   },
@@ -47,7 +47,7 @@ export const MOCK_USERS: User[] = [
     email: "cpo@policia.pe.gov.br", 
     role: "planning",
     roles: ["planning"],
-    permissions: ["VIEW_DASHBOARD", "APPROVE_WORKFLOW"],
+    permissions: ["APPROVE_WORKFLOWS"],
     accessMenus: ["/dashboard", "/targets", "/validations", "/map", "/indicators"],
     linkedOperations: []
   },
@@ -57,7 +57,7 @@ export const MOCK_USERS: User[] = [
     email: "gestao@sds.pe.gov.br", 
     role: "management",
     roles: ["management"],
-    permissions: ["VIEW_DASHBOARD"],
+    permissions: [],
     accessMenus: ["/dashboard", "/indicators"],
     linkedOperations: []
   },

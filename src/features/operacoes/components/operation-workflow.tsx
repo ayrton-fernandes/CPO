@@ -36,6 +36,7 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
 
   const currentStepIndex = STEPS.findIndex(s => s.id === operation.status);
   const isMaturityLow = operation.maturity < 70;
+  const hasApprovePermission = user.permissions?.includes('APPROVE_WORKFLOWS') || user.role === 'admin_master';
 
   const handleStatusChange = (newStatus: OperationStatus) => {
     operationsService.updateStatus(operation.id, newStatus);
@@ -80,13 +81,11 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
   };
 
   const renderActions = () => {
-    const { role } = user;
+    const { role, permissions } = user;
     const { status } = operation;
 
-    // Ações para Inteligência
-    if ((role === 'intelligence_manager' || role === 'analyst' || role === 'admin_master') && status === 'EM_ANALISE') {
-        const canForce = role === 'admin_master' || role === 'intelligence_manager';
-
+    // Ações para Inteligência / Quem pode editar
+    if ((permissions?.includes('EDIT_OPERATIONS') || role === 'admin_master') && status === 'EM_ANALISE') {
         return (
             <div className="flex flex-col gap-3">
                 <div className={cn(
@@ -96,7 +95,7 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
                     <AlertTriangle className="h-4 w-4 mt-0.5" />
                     <p className="text-xs">
                         {isMaturityLow 
-                            ? `Maturidade insuficiente (${operation.maturity}%). Mínimo de 70% para validar.` 
+                            ? `Maturidade insuficiente (${operation.maturity}%). Mínimo de 70% recomendado para validação.` 
                             : "Maturidade ideal. A operação pode ser enviada para validação estratégica."}
                     </p>
                 </div>
@@ -104,28 +103,18 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
                 <div className="flex gap-2">
                     <Button 
                         onClick={() => handleStatusChange('AGUARDANDO_VALIDACAO')} 
-                        disabled={isMaturityLow}
+                        disabled={isMaturityLow && !hasApprovePermission}
                         className="flex-1"
                     >
                         <Send className="h-4 w-4 mr-2" /> Solicitar Validação
                     </Button>
-                    
-                    {isMaturityLow && canForce && (
-                        <Button 
-                            variant="destructive" 
-                            className="flex-none bg-red-100 text-red-700 hover:bg-red-200 border border-red-200"
-                            onClick={() => setIsForceApprovalOpen(true)}
-                        >
-                            <ShieldAlert className="h-4 w-4 mr-2" /> Forçar Aprovação
-                        </Button>
-                    )}
                 </div>
             </div>
         );
     }
 
-    // Ações para Planejamento
-    if ((role === 'planning' || role === 'admin_master') && status === 'AGUARDANDO_VALIDACAO') {
+    // Ações para quem pode aprovar (Planejamento / Master)
+    if (hasApprovePermission && status === 'AGUARDANDO_VALIDACAO') {
         return (
             <div className="flex gap-3">
                 <Button variant="outline" className="flex-1 text-red-600 border-red-200" onClick={() => setIsCorrectionOpen(true)}>
@@ -138,7 +127,7 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
         );
     }
 
-    if ((role === 'planning' || role === 'admin_master') && status === 'PLANEJAMENTO') {
+    if (hasApprovePermission && status === 'PLANEJAMENTO') {
         return (
             <Button onClick={() => handleStatusChange('PRONTA_EXECUCAO')} className="w-full sm:w-auto bg-gov-blue">
                 <ArrowRight className="h-4 w-4 mr-2" /> Liberar para Execução
@@ -146,8 +135,8 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
         );
     }
 
-    // Finalizar (Apenas Gerente e Master)
-    if ((role === 'intelligence_manager' || role === 'admin_master') && status === 'PRONTA_EXECUCAO') {
+    // Finalizar
+    if (hasApprovePermission && status === 'PRONTA_EXECUCAO') {
         return (
             <Button onClick={() => handleStatusChange('FINALIZADA')} variant="secondary" className="w-full sm:w-auto">
                 <Archive className="h-4 w-4 mr-2" /> Finalizar e Arquivar

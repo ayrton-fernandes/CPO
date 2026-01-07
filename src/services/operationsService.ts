@@ -1,13 +1,15 @@
-import { Operation, OperationStatus, Target } from "@/types";
+import { Operation, Target, OperationStatus } from "@/types";
 import { database } from "./database";
 import { calculateMaturity } from "./mockData";
 
 export const operationsService = {
+  getAll: (userId?: string, role?: string): Operation[] => {
+    return database.getOperations(userId, role);
+  },
+
   getById: (id: string): Operation | undefined => {
     return database.getOperationById(id);
   },
-
-  getAll: () => database.getOperations(),
 
   getAllTargets: (): Target[] => {
     return database.getTargets();

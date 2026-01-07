@@ -22,6 +22,8 @@ export function OperationDocuments({ operation, onUpdate }: OperationDocumentsPr
 
   if (!user) return null;
 
+  const canEdit = user.role === 'admin_master' || user.permissions?.includes('EDIT_OPERATIONS');
+
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -68,17 +70,21 @@ export function OperationDocuments({ operation, onUpdate }: OperationDocumentsPr
             <CardDescription>Documentos custodiados e provas digitais.</CardDescription>
           </div>
           <div>
-            <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
-              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
-              Upload de Doc
-            </Button>
-            <input 
-                type="file" 
-                ref={fileInputRef} 
-                className="hidden" 
-                onChange={handleFileUpload} 
-                accept=".pdf,.jpg,.png,.doc,.docx"
-            />
+            {canEdit && (
+                <>
+                    <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                    Upload de Doc
+                    </Button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        onChange={handleFileUpload} 
+                        accept=".pdf,.jpg,.png,.doc,.docx"
+                    />
+                </>
+            )}
           </div>
         </CardHeader>
         <CardContent>
@@ -106,8 +112,10 @@ export function OperationDocuments({ operation, onUpdate }: OperationDocumentsPr
                             </div>
                         </div>
                         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-gov-blue"><Download className="h-4 w-4" /></Button>
-                            <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => deleteDoc(doc.id)}><Trash2 className="h-4 w-4" /></Button>
+                            <Button size="icon" variant="ghost" className="h-8 w-8 text-gov-blue" title="Download"><Download className="h-4 w-4" /></Button>
+                            {canEdit && (
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-500" onClick={() => deleteDoc(doc.id)} title="Excluir"><Trash2 className="h-4 w-4" /></Button>
+                            )}
                         </div>
                     </div>
                 ))

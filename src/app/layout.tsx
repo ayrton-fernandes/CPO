@@ -33,7 +33,7 @@ export default function RootLayout({
         <AppShell>
           {children}
         </AppShell>
-        <ResetDemoButton />
+        {/* <ResetDemoButton /> */}
         <Toaster richColors position="top-right" />
       </body>
     </html>

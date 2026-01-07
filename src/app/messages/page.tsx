@@ -24,18 +24,18 @@ export default function MessagesPage() {
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  
   const [composeData, setComposeData] = useState({
-    recipientType: "user" as "user" | "operation",
-    recipientId: "",
+    recipientIds: [] as string[],
+    operationIds: [] as string[],
     subject: "",
     content: ""
   });
 
   const loadMessages = () => {
     if (user) {
-      setMessages(database.getMessages(user.id).sort((a, b) => 
-        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-      ));
+      setMessages(database.getMessages(user.id));
     }
   };
 
@@ -47,28 +47,32 @@ export default function MessagesPage() {
     }
   }, [isAuthenticated, user, router]);
 
+  const handleOpenMessage = (msg: Message) => {
+    setSelectedMessage(msg);
+    if (!msg.isRead) {
+        database.markMessageAsRead(msg.id);
+        loadMessages();
+    }
+  };
+
   const handleSendMessage = () => {
     if (!user) return;
-    if (!composeData.recipientId || !composeData.subject || !composeData.content) {
-        toast.error("Preencha todos os campos.");
+    if ((composeData.recipientIds.length === 0 && composeData.operationIds.length === 0) || !composeData.subject || !composeData.content) {
+        toast.error("Selecione pelo menos um destinatário e preencha o assunto/conteúdo.");
         return;
     }
 
-    const newMessage: Message = {
-        id: `msg-${Date.now()}`,
+    database.sendMessage({
         senderId: user.id,
-        recipientId: composeData.recipientType === 'user' ? composeData.recipientId : undefined,
-        recipientOperationId: composeData.recipientType === 'operation' ? composeData.recipientId : undefined,
+        recipientIds: composeData.recipientIds,
+        operationIds: composeData.operationIds,
         subject: composeData.subject,
-        content: composeData.content,
-        createdAt: new Date().toISOString(),
-        isRead: false
-    };
+        content: composeData.content
+    });
 
-    database.sendMessage(newMessage);
     toast.success("Mensagem enviada com sucesso!");
     setIsComposeOpen(false);
-    setComposeData({ recipientType: "user", recipientId: "", subject: "", content: "" });
+    setComposeData({ recipientIds: [], operationIds: [], subject: "", content: "" });
     loadMessages();
   };
 
@@ -76,12 +80,28 @@ export default function MessagesPage() {
     return usersService.getById(id)?.name || "Usuário Desconhecido";
   };
 
+  const toggleRecipientId = (id: string) => {
+    setComposeData(prev => ({
+        ...prev,
+        recipientIds: prev.recipientIds.includes(id) 
+            ? prev.recipientIds.filter(i => i !== id) 
+            : [...prev.recipientIds, id]
+    }));
+  };
+
+  const toggleOperationId = (id: string) => {
+    setComposeData(prev => ({
+        ...prev,
+        operationIds: prev.operationIds.includes(id) 
+            ? prev.operationIds.filter(i => i !== id) 
+            : [...prev.operationIds, id]
+    }));
+  };
+
   if (!isAuthenticated || !user) return null;
 
   const availableUsers = usersService.getAll().filter(u => u.id !== user.id);
-  const availableOperations = operationsService.getAll().filter(op => 
-    user.role === 'admin_master' || user.linkedOperations?.includes(op.id)
-  );
+  const availableOperations = operationsService.getAll(user.id, user.role);
 
   return (
     <div className="flex">
@@ -97,7 +117,7 @@ export default function MessagesPage() {
             </Button>
         </div>
 
-        <div className="grid gap-4">
+        <div className="grid gap-3">
             {messages.length === 0 ? (
                 <Card className="bg-gray-50 border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-12 text-gray-400">
@@ -107,27 +127,29 @@ export default function MessagesPage() {
                 </Card>
             ) : (
                 messages.map((msg) => (
-                    <Card key={msg.id} className={`hover:shadow-md transition-shadow cursor-pointer ${!msg.isRead ? 'border-l-4 border-l-gov-blue' : ''}`}>
+                    <Card 
+                        key={msg.id} 
+                        onClick={() => handleOpenMessage(msg)}
+                        className={`hover:shadow-md transition-shadow cursor-pointer border-l-4 ${!msg.isRead ? 'border-l-blue-600 bg-blue-50/30' : 'border-l-gray-200'}`}
+                    >
                         <CardContent className="p-4 flex items-center gap-4">
-                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-gov-blue">
+                            <div className={`h-10 w-10 rounded-full flex items-center justify-center ${!msg.isRead ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-400'}`}>
                                 <UserIcon className="h-5 w-5" />
                             </div>
                             <div className="flex-1 min-w-0">
                                 <div className="flex justify-between items-start mb-1">
-                                    <h3 className="font-bold text-sm text-gray-900 truncate">{msg.subject}</h3>
+                                    <div className="flex items-center gap-2">
+                                        {!msg.isRead && <div className="h-2 w-2 rounded-full bg-blue-600" />}
+                                        <h3 className={`text-sm truncate ${!msg.isRead ? 'font-bold text-blue-900' : 'text-gray-900'}`}>{msg.subject}</h3>
+                                    </div>
                                     <span className="text-[10px] text-gray-400 whitespace-nowrap">
                                         {format(new Date(msg.createdAt), "dd MMM, HH:mm", { locale: ptBR })}
                                     </span>
                                 </div>
                                 <div className="flex items-center gap-2 text-xs text-gray-500">
                                     <span className="font-semibold">{getSenderName(msg.senderId)}</span>
-                                    {msg.recipientOperationId && (
-                                        <Badge variant="outline" className="text-[9px] h-4 bg-orange-50 text-orange-700 border-orange-200">
-                                            Operação: {operationsService.getById(msg.recipientOperationId)?.title}
-                                        </Badge>
-                                    )}
                                 </div>
-                                <p className="text-sm text-gray-600 mt-2 line-clamp-1">{msg.content}</p>
+                                <p className="text-sm text-gray-600 mt-1 line-clamp-1">{msg.content}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -135,38 +157,76 @@ export default function MessagesPage() {
             )}
         </div>
 
-        <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+        {/* Modal de Leitura */}
+        <Dialog open={!!selectedMessage} onOpenChange={(open) => !open && setSelectedMessage(null)}>
             <DialogContent className="max-w-2xl bg-white">
+                {selectedMessage && (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="text-xl font-bold text-gov-blue">{selectedMessage.subject}</DialogTitle>
+                            <div className="flex items-center justify-between text-xs text-gray-500 mt-2 border-b pb-4">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-gov-blue font-bold">
+                                        {getSenderName(selectedMessage.senderId).charAt(0)}
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-gray-900">{getSenderName(selectedMessage.senderId)}</span>
+                                        <span>Remetente</span>
+                                    </div>
+                                </div>
+                                <span>{format(new Date(selectedMessage.createdAt), "PPPP 'às' HH:mm", { locale: ptBR })}</span>
+                            </div>
+                        </DialogHeader>
+                        <div className="py-6 text-gray-700 whitespace-pre-wrap leading-relaxed">
+                            {selectedMessage.content}
+                        </div>
+                        <DialogFooter>
+                            <Button onClick={() => setSelectedMessage(null)} className="bg-gov-blue">Fechar</Button>
+                        </DialogFooter>
+                    </>
+                )}
+            </DialogContent>
+        </Dialog>
+
+        {/* Modal de Composição */}
+        <Dialog open={isComposeOpen} onOpenChange={setIsComposeOpen}>
+            <DialogContent className="max-w-3xl bg-white max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle>Nova Mensagem Interna</DialogTitle>
                 </DialogHeader>
-                <div className="space-y-4 py-4">
-                    <div className="flex gap-4">
-                        <div className="flex-1 space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Tipo de Destinatário</label>
-                            <select 
-                                className="w-full h-10 border rounded px-3 text-sm focus:ring-2 focus:ring-gov-blue outline-none"
-                                value={composeData.recipientType}
-                                onChange={(e) => setComposeData({...composeData, recipientType: e.target.value as any, recipientId: ""})}
-                            >
-                                <option value="user">Usuário Específico</option>
-                                <option value="operation">Toda a Equipe da Operação</option>
-                            </select>
+                <div className="space-y-6 py-4">
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-500 uppercase">Destinatários (Usuários)</label>
+                            <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50 space-y-1">
+                                {availableUsers.map(u => (
+                                    <label key={u.id} className="flex items-center gap-2 p-1 hover:bg-white rounded cursor-pointer text-xs">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={composeData.recipientIds.includes(u.id)}
+                                            onChange={() => toggleRecipientId(u.id)}
+                                            className="rounded text-gov-blue"
+                                        />
+                                        <span>{u.name}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
-                        <div className="flex-[2] space-y-2">
-                            <label className="text-xs font-bold text-gray-500 uppercase">Destinatário</label>
-                            <select 
-                                className="w-full h-10 border rounded px-3 text-sm focus:ring-2 focus:ring-gov-blue outline-none"
-                                value={composeData.recipientId}
-                                onChange={(e) => setComposeData({...composeData, recipientId: e.target.value})}
-                            >
-                                <option value="">Selecione...</option>
-                                {composeData.recipientType === 'user' ? (
-                                    availableUsers.map(u => <option key={u.id} value={u.id}>{u.name}</option>)
-                                ) : (
-                                    availableOperations.map(op => <option key={op.id} value={op.id}>{op.title}</option>)
-                                )}
-                            </select>
+                        <div className="space-y-2">
+                            <label className="text-xs font-bold text-gray-500 uppercase">Grupos (Operações)</label>
+                            <div className="max-h-40 overflow-y-auto border rounded p-2 bg-gray-50 space-y-1">
+                                {availableOperations.map(op => (
+                                    <label key={op.id} className="flex items-center gap-2 p-1 hover:bg-white rounded cursor-pointer text-xs">
+                                        <input 
+                                            type="checkbox" 
+                                            checked={composeData.operationIds.includes(op.id)}
+                                            onChange={() => toggleOperationId(op.id)}
+                                            className="rounded text-gov-blue"
+                                        />
+                                        <span className="truncate">{op.title}</span>
+                                    </label>
+                                ))}
+                            </div>
                         </div>
                     </div>
 

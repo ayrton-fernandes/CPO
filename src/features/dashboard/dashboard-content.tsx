@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useAuthStore } from "@/hooks/useAuthStore";
-import { MOCK_OPERATIONS } from "@/services/mockData";
+import { operationsService } from "@/services/operationsService";
+import { Operation } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ShieldAlert, Clock, CheckCircle2, FileText, ArrowRight } from "lucide-react";
@@ -13,6 +14,7 @@ import { OperationsFilter, FilterState } from "@/features/operacoes/components/o
 
 export function DashboardContent() {
   const { user } = useAuthStore();
+  const [allOperations, setAllOperations] = useState<Operation[]>([]);
   const [filters, setFilters] = useState<FilterState>({
     priority: null,
     department: "",
@@ -20,20 +22,14 @@ export function DashboardContent() {
     endDate: "",
   });
 
-  // Filter logic based on role (simplified)
-  const baseOperations = useMemo(() => {
-     if (!user) return [];
-     return MOCK_OPERATIONS.filter(op => {
-        if (user.role === 'admin_master' || user.role === 'management') return true;
-        if (user.role === 'intelligence_manager') return op.createdBy === user.id || op.status === 'EM_ANALISE';
-        if (user.role === 'investigator' || user.role === 'analyst') return op.assignedAgents.includes(user.id) || op.status === 'EM_ANALISE';
-        if (user.role === 'planning') return true;
-        return false;
-      });
+  useEffect(() => {
+    if (user) {
+        setAllOperations(operationsService.getAll(user.id, user.role));
+    }
   }, [user]);
 
   const myOperations = useMemo(() => {
-    return baseOperations.filter(op => {
+    return allOperations.filter(op => {
         // Priority Filter
         if (filters.priority && op.priority !== filters.priority) return false;
         
@@ -56,7 +52,7 @@ export function DashboardContent() {
 
         return true;
     });
-  }, [baseOperations, filters]);
+  }, [allOperations, filters]);
 
   if (!user) return null;
 

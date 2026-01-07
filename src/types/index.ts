@@ -7,13 +7,10 @@ export type UserRole =
   | 'management';
 
 export type UserPermission = 
-  | 'VIEW_DASHBOARD'
-  | 'EDIT_OPERATION'
-  | 'APPROVE_WORKFLOW'
-  | 'MANAGE_USERS'
-  | 'VIEW_SENSITIVE_DATA'
-  | 'SELF_MANAGE_CREDENTIALS'
-  | 'EDIT_TARGETS';
+  | 'APPROVE_WORKFLOWS'
+  | 'EDIT_OPERATIONS'
+  | 'MANAGE_CREDENTIALS'
+  | 'EDIT_GLOBAL_TARGETS';
 
 export interface User {
   id: string;
@@ -27,6 +24,7 @@ export interface User {
   avatar?: string;
   linkedOperations?: string[]; // Operation IDs
   accessMenus?: string[]; // Route paths
+  expirationDate?: string; // ISO Date for temporary profiles
 }
 
 // Alias for backward compatibility if needed, though we should prefer UserRole

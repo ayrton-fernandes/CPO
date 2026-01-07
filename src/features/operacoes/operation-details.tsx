@@ -84,7 +84,7 @@ export function OperationDetails({ id }: OperationDetailsProps) {
             <Button variant="outline" size="sm" className="bg-white">
                 <FileDown className="h-4 w-4 mr-2" /> Dossiê PDF
             </Button>
-            {(user?.role === 'admin_master' || user?.role === 'intelligence_manager') && (
+            {(user?.role === 'admin_master' || user?.permissions?.includes('EDIT_OPERATIONS')) && (
                 <Button size="sm" onClick={() => setIsEditModalOpen(true)}>
                     <Edit3 className="h-4 w-4 mr-2" /> Editar Operação
                 </Button>
@@ -116,13 +116,15 @@ export function OperationDetails({ id }: OperationDetailsProps) {
       </Card>
 
       <Tabs defaultValue="targets" className="w-full">
-        <TabsList className="grid w-full grid-cols-5 max-w-3xl">
-          <TabsTrigger value="targets">Alvos & Vínculos</TabsTrigger>
-          <TabsTrigger value="general">Geral</TabsTrigger>
-          <TabsTrigger value="documents">Documentos</TabsTrigger>
-          <TabsTrigger value="reports">Relatórios</TabsTrigger>
-          <TabsTrigger value="workflow">Workflow</TabsTrigger>
-        </TabsList>
+        <div className="overflow-x-auto pb-2 -mx-4 px-4 lg:mx-0 lg:px-0">
+            <TabsList className="flex w-max lg:grid lg:w-full lg:grid-cols-5 lg:max-w-3xl">
+                <TabsTrigger value="targets">Alvos & Vínculos</TabsTrigger>
+                <TabsTrigger value="general">Geral</TabsTrigger>
+                <TabsTrigger value="documents">Documentos</TabsTrigger>
+                <TabsTrigger value="reports">Relatórios</TabsTrigger>
+                <TabsTrigger value="workflow">Workflow</TabsTrigger>
+            </TabsList>
+        </div>
         
         <TabsContent value="targets" className="mt-6">
           <OperationTargets operation={operation} onUpdate={fetchOperation} />
@@ -150,9 +152,11 @@ export function OperationDetails({ id }: OperationDetailsProps) {
           <Button variant="outline" className="flex-1 text-xs h-11" onClick={() => window.print()}>
               <FileDown className="h-4 w-4 mr-2" /> PDF
           </Button>
-          <Button className="flex-1 text-xs h-11 bg-gov-blue" onClick={() => setIsEditModalOpen(true)}>
-              <Edit3 className="h-4 w-4 mr-2" /> Editar
-          </Button>
+          {(user?.role === 'admin_master' || user?.permissions?.includes('EDIT_OPERATIONS')) && (
+            <Button className="flex-1 text-xs h-11 bg-gov-blue" onClick={() => setIsEditModalOpen(true)}>
+                <Edit3 className="h-4 w-4 mr-2" /> Editar
+            </Button>
+          )}
       </div>
 
       <EditOperationModal 

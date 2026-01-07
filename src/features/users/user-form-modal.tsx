@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { User, UserRole, UserPermission } from "@/types";
-import { operationsService } from "@/services/operationsService";
+import { database } from "@/services/database";
 import { usersService } from "@/services/usersService";
 import { toast } from "sonner";
 
@@ -26,28 +26,27 @@ const ROLES: { label: string; value: UserRole }[] = [
 ];
 
 const PERMISSIONS: { label: string; value: UserPermission }[] = [
-  { label: "Visualizar Dashboard", value: "VIEW_DASHBOARD" },
-  { label: "Editar Operações", value: "EDIT_OPERATION" },
-  { label: "Aprovar Workflows", value: "APPROVE_WORKFLOW" },
-  { label: "Gerenciar Usuários", value: "MANAGE_USERS" },
-  { label: "Visualizar Dados Sensíveis", value: "VIEW_SENSITIVE_DATA" },
-  { label: "Gerenciar Próprias Credenciais", value: "SELF_MANAGE_CREDENTIALS" },
-  { label: "Editar Alvos (Banco Global)", value: "EDIT_TARGETS" },
+  { label: "Aprovar Workflows", value: "APPROVE_WORKFLOWS" },
+  { label: "Editar Operações", value: "EDIT_OPERATIONS" },
+  { label: "Gerenciar Próprias Credenciais", value: "MANAGE_CREDENTIALS" },
+  { label: "Editar Alvos (Banco Global)", value: "EDIT_GLOBAL_TARGETS" },
 ];
 
 const MENUS = [
   { label: "Dashboard", path: "/dashboard" },
   { label: "Mensagens", path: "/messages" },
-  { label: "Operações", path: "/operations" },
+  { label: "Minhas Operações", path: "/operations" },
   { label: "Banco de Alvos", path: "/targets" },
   { label: "Validações", path: "/validations" },
   { label: "Relatórios", path: "/reports" },
-  { label: "Gestão de Usuários", path: "/users" },
+  { label: "Banco de Usuários", path: "/users" },
   { label: "Indicadores", path: "/indicators" },
   { label: "Auditoria", path: "/audit" },
 ];
 
 export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormModalProps) {
+  const [isTemporary, setIsTemporary] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [formData, setFormData] = useState<Partial<User>>({
     name: "",
     email: "",
@@ -56,13 +55,14 @@ export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormM
     permissions: [],
     linkedOperations: [],
     accessMenus: [],
+    expirationDate: "",
   });
 
   const [availableOperations, setAvailableOperations] = useState<{id: string, title: string}[]>([]);
 
   useEffect(() => {
     // Load operations for the select list
-    const ops = operationsService.getAll().map(op => ({ id: op.id, title: op.title }));
+    const ops = database.getOperations().map(op => ({ id: op.id, title: op.title }));
     setAvailableOperations(ops);
   }, [isOpen]);
 
@@ -76,6 +76,7 @@ export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormM
             accessMenus: userToEdit.accessMenus || [],
             linkedOperations: userToEdit.linkedOperations || []
         });
+        setIsTemporary(!!userToEdit.expirationDate);
       } else {
         // Reset for new user
         setFormData({
@@ -83,13 +84,25 @@ export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormM
             email: "",
             role: "investigator",
             roles: ["investigator"],
-            permissions: ["VIEW_DASHBOARD"],
+            permissions: [],
             linkedOperations: [],
             accessMenus: ["/dashboard"],
+            expirationDate: "",
         });
+        setIsTemporary(false);
       }
+      setShowDeleteConfirm(false);
     }
   }, [isOpen, userToEdit]);
+
+  const handleDelete = () => {
+    if (userToEdit) {
+        usersService.delete(userToEdit.id);
+        toast.success("Usuário excluído com sucesso.");
+        onSave();
+        onClose();
+    }
+  };
 
   const handleSave = () => {
     if (!formData.name || !formData.email) {
@@ -98,12 +111,15 @@ export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormM
     }
 
     try {
-        const dataToSave = {
+        const dataToSave: any = {
             ...formData,
             permissions: formData.permissions || [],
+            accessMenus: formData.accessMenus || [],
+            linkedOperations: formData.linkedOperations || [],
             roles: formData.roles || (formData.role ? [formData.role] : ["investigator"]),
             role: formData.role || "investigator",
-        } as Omit<User, "id">;
+            expirationDate: isTemporary ? formData.expirationDate : undefined,
+        };
 
         if (userToEdit) {
             usersService.update(userToEdit.id, dataToSave);
@@ -188,6 +204,37 @@ export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormM
             </select>
           </div>
 
+          {/* Perfil Temporário */}
+          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 space-y-4">
+            <label className="flex items-center space-x-2 cursor-pointer">
+              <input 
+                type="checkbox" 
+                className="rounded text-blue-700 focus:ring-blue-700 h-4 w-4"
+                checked={isTemporary}
+                onChange={(e) => setIsTemporary(e.target.checked)}
+              />
+              <span className="text-sm font-bold text-blue-900 uppercase">Perfil Temporário?</span>
+            </label>
+
+            {isTemporary && (
+              <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-blue-700 uppercase">Data de Expiração</label>
+                  <Input 
+                    type="date"
+                    value={formData.expirationDate || ""} 
+                    onChange={(e) => setFormData({...formData, expirationDate: e.target.value})} 
+                  />
+                </div>
+                <div className="flex items-end pb-2">
+                  <p className="text-[10px] text-blue-600 italic">
+                    O acesso será bloqueado automaticamente após esta data.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+
           {/* Permissões */}
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase block">Permissões de Acesso</label>
@@ -248,9 +295,26 @@ export function UserFormModal({ userToEdit, isOpen, onClose, onSave }: UserFormM
 
         </div>
 
-        <DialogFooter>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button className="bg-gov-blue hover:bg-blue-800 text-white" onClick={handleSave}>Salvar Usuário</Button>
+        <DialogFooter className="flex flex-col sm:flex-row justify-between gap-4">
+          <div className="flex-1">
+            {userToEdit && (
+                showDeleteConfirm ? (
+                    <div className="flex items-center gap-2 p-2 bg-red-50 border border-red-100 rounded">
+                        <span className="text-xs text-red-700 font-bold">Confirmar exclusão?</span>
+                        <Button variant="destructive" size="sm" onClick={handleDelete} className="h-8 px-2 text-[10px]">SIM, EXCLUIR</Button>
+                        <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)} className="h-8 px-2 text-[10px]">NÃO</Button>
+                    </div>
+                ) : (
+                    <Button variant="ghost" onClick={() => setShowDeleteConfirm(true)} className="text-red-500 hover:text-red-600 hover:bg-red-50 text-xs">
+                        Excluir Usuário
+                    </Button>
+                )
+            )}
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+            <Button className="bg-gov-blue hover:bg-blue-800 text-white" onClick={handleSave}>Salvar Usuário</Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

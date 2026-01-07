@@ -102,22 +102,24 @@ export default function TargetsPage() {
                 <p className="text-gray-500">Repositório central de indivíduos sob investigação.</p>
             </div>
             
-            <Button onClick={handleAddTarget}>
-                <Plus className="h-4 w-4 mr-2" /> Cadastrar Novo Alvo
-            </Button>
+            {(user?.role === 'admin_master' || user?.permissions?.includes('EDIT_GLOBAL_TARGETS')) && (
+                <Button onClick={handleAddTarget}>
+                    <Plus className="h-4 w-4 mr-2" /> Cadastrar Novo Alvo
+                </Button>
+            )}
         </div>
 
-        <div className="mb-6 relative max-w-md">
+        <div className="mb-6 relative w-full lg:max-w-md">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input 
                 placeholder="Buscar por nome, vulgo ou CPF..." 
-                className="pl-10"
+                className="pl-10 w-full"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
             />
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {filteredTargets.map((target) => (
                 <Card key={target.id} className="hover:shadow-md transition-shadow border-l-4 border-l-gov-blue flex flex-col">
                     <CardHeader className="pb-2">
@@ -138,9 +140,11 @@ export default function TargetsPage() {
                                 </div>
                             </div>
                             <div className="flex flex-col items-end gap-1">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTarget(target)}>
-                                    <Edit2 className="h-4 w-4" />
-                                </Button>
+                                {(user?.role === 'admin_master' || user?.permissions?.includes('EDIT_GLOBAL_TARGETS')) && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditTarget(target)}>
+                                        <Edit2 className="h-4 w-4" />
+                                    </Button>
+                                )}
                                 <Badge variant={target.riskLevel === 'EXTREME' || target.riskLevel === 'HIGH' ? 'destructive' : 'default'} className="text-[10px]">
                                     {target.riskLevel}
                                 </Badge>

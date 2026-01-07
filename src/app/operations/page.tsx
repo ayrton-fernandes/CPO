@@ -21,8 +21,13 @@ export default function OperationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [priorityFilter, setPriorityFilter] = useState<string>("ALL");
+  const [allOperations, setAllOperations] = useState<Operation[]>([]);
 
-  const allOperations = useMemo(() => operationsService.getAll(), []);
+  useEffect(() => {
+    if (user) {
+        setAllOperations(operationsService.getAll(user.id, user.role));
+    }
+  }, [user]);
 
   const filteredOperations = useMemo(() => {
     return allOperations.filter(op => {
@@ -31,12 +36,9 @@ export default function OperationsPage() {
       const matchesStatus = statusFilter === "ALL" || op.status === statusFilter;
       const matchesPriority = priorityFilter === "ALL" || op.priority === priorityFilter;
       
-      // Regra de visibilidade: Investigador só vê as suas (simulado pelo agents array)
-      const canSee = user?.role === 'investigator' ? op.assignedAgents.includes(user.id) : true;
-
-      return matchesSearch && matchesStatus && matchesPriority && canSee;
+      return matchesSearch && matchesStatus && matchesPriority;
     });
-  }, [allOperations, searchTerm, statusFilter, priorityFilter, user]);
+  }, [allOperations, searchTerm, statusFilter, priorityFilter]);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -103,23 +105,25 @@ export default function OperationsPage() {
             ) : (
                 filteredOperations.map((op) => (
                     <Card key={op.id} className="hover:shadow-md transition-shadow group border-l-4 border-l-gov-blue">
-                        <CardContent className="p-4 flex flex-col md:flex-row items-center justify-between gap-4">
+                        <CardContent className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                             <div className="flex-1 space-y-2">
-                                <div className="flex items-center gap-3">
-                                    <h3 className="font-bold text-lg text-gov-blue group-hover:underline">{op.title}</h3>
-                                    <Badge variant="secondary" className="text-[10px] uppercase font-bold">{op.status.replace('_', ' ')}</Badge>
-                                    <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
-                                        Maturidade: {op.maturity}%
+                                <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                                    <h3 className="font-bold text-base md:text-lg text-gov-blue group-hover:underline">{op.title}</h3>
+                                    <div className="flex gap-2">
+                                        <Badge variant="secondary" className="text-[10px] uppercase font-bold">{op.status.replace('_', ' ')}</Badge>
+                                        <div className="flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
+                                            {op.maturity}%
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
                                     <span className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {op.location}</span>
                                     <span className="flex items-center gap-1 font-medium"><Shield className="h-3 w-3" /> {op.priority}</span>
                                     <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> {new Date(op.createdAt).toLocaleDateString()}</span>
                                 </div>
                             </div>
-                            <Button variant="ghost" size="sm" asChild>
-                                <Link href={`/operations/${op.id}`}>
+                            <Button variant="outline" size="sm" asChild className="w-full md:w-auto border-gov-blue text-gov-blue hover:bg-blue-50">
+                                <Link href={`/operations/${op.id}`} className="w-full flex justify-center items-center">
                                     Gerenciar <ArrowRight className="ml-2 h-4 w-4" />
                                 </Link>
                             </Button>

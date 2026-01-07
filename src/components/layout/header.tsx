@@ -245,10 +245,13 @@ export function Header() {
                     </div>
 
                     <div className="space-y-2">
-                         <p className="text-xs font-bold text-gray-400 uppercase">Campos Alterados</p>
-                         <div className="border rounded-md p-3 bg-gray-50/50 space-y-1 text-xs">
+                         <p className="text-xs font-bold text-gray-400 uppercase">Alterações Detectadas</p>
+                         <div className="border rounded-md p-3 bg-gray-50/50 space-y-2 text-xs">
                             {formatAuditLog(selectedAuditLog).map((change, index) => (
-                                <p key={index} className="font-mono text-gray-700">{change}</p>
+                                <div key={index} className="flex items-start gap-2">
+                                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                                    <p className="text-gray-700">{change}</p>
+                                </div>
                             ))}
                          </div>
                     </div>

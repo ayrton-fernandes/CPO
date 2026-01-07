@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { User } from '@/types';
-import { MOCK_USERS } from '@/services/mockData';
+import { usersService } from '@/services/usersService';
+import { toast } from 'sonner';
 
 interface AuthState {
   user: User | null;
@@ -28,15 +29,36 @@ export const useAuthStore = create<AuthState>()(
       login: async (username, password) => {
         await new Promise((resolve) => setTimeout(resolve, 500));
 
-        if (password === '123' && CREDENTIALS_MAP[username]) {
-          const userId = CREDENTIALS_MAP[username];
-          const foundUser = MOCK_USERS.find((u) => u.id === userId);
+        // In a real app, this would be an API call. 
+        // For the prototype, we check the local database.
+        
+        const allUsers = usersService.getAll();
+        
+        // Check for direct email login OR mapped credentials
+        const userId = CREDENTIALS_MAP[username];
+        const foundUser = allUsers.find((u) => u.id === userId || u.email === username);
 
-          if (foundUser) {
-            set({ user: foundUser, isAuthenticated: true });
-            return true;
+        if (foundUser && (password === '123' || password === '123456')) {
+          // Check for expiration
+          if (foundUser.expirationDate) {
+            const [year, month, day] = foundUser.expirationDate.split("-").map(Number);
+            const expDate = new Date(year, month - 1, day, 23, 59, 59, 999);
+            const now = new Date();
+            
+            // Set time to end of day for expiration check
+            expDate.setHours(23, 59, 59, 999);
+            
+            if (now > expDate) {
+              toast.error("Acesso expirado em " + expDate.toLocaleDateString());
+              return false;
+            }
           }
+
+          set({ user: foundUser, isAuthenticated: true });
+          return true;
         }
+        
+        toast.error("Credenciais inválidas");
         return false;
       },
       logout: () => set({ user: null, isAuthenticated: false }),

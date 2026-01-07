@@ -85,7 +85,8 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
     }
   };
 
-  const canUnlink = user?.role === 'admin_master' || user?.role === 'intelligence_manager';
+  const canEdit = user?.role === 'admin_master' || user?.permissions?.includes('EDIT_OPERATIONS');
+  const canUnlink = user?.role === 'admin_master' || user?.role === 'intelligence_manager' || user?.permissions?.includes('EDIT_OPERATIONS');
 
   return (
     <div className="space-y-6">
@@ -94,9 +95,11 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
             <h3 className="text-lg font-bold text-gray-800">Investigados ({operation.targets.length})</h3>
             <p className="text-sm text-gray-500">Gestão de fichas e dactiloscopia.</p>
         </div>
-        <Button size="sm" onClick={handleAddTarget}>
-          <Plus className="h-4 w-4 mr-2" /> Vincular Alvo
-        </Button>
+        {canEdit && (
+            <Button size="sm" onClick={handleAddTarget}>
+                <Plus className="h-4 w-4 mr-2" /> Vincular Alvo
+            </Button>
+        )}
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -126,9 +129,11 @@ export function OperationTargets({ operation, onUpdate }: OperationTargetsProps)
                         </div>
                     </div>
                     <div className="flex gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleEditTarget(target)} title="Editar Dados">
-                            <Edit2 className="h-4 w-4" />
-                        </Button>
+                        {canEdit && (
+                            <Button variant="ghost" size="icon" onClick={() => handleEditTarget(target)} title="Editar Dados">
+                                <Edit2 className="h-4 w-4" />
+                            </Button>
+                        )}
                         {canUnlink && (
                              <Button variant="ghost" size="icon" onClick={() => handleUnlinkTarget(target)} className="text-red-500 hover:text-red-700 hover:bg-red-50" title="Desvincular da Operação">
                                 <Unlink className="h-4 w-4" />
