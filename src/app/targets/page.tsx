@@ -1,6 +1,7 @@
 "use client";
 
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PageContainer } from "@/components/layout/page-container";
 import { operationsService } from "@/services/operationsService";
@@ -9,7 +10,8 @@ import { Badge } from "@/components/ui/badge";
 import { User, ShieldAlert, MapPin, Search, Plus, Edit2, Trash2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { useState, useMemo, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { TargetModal } from "@/features/operacoes/components/target-modal";
 import { Target } from "@/types";
 import { toast } from "sonner";
@@ -26,7 +28,9 @@ import {
 
 
 export default function TargetsPage() {
-  const { isAuthenticated, user } = useAuthStore();
+  const { isAuthenticated, isHydrated, user } = useAuthStore();
+  const refreshKey = useDataRefresh();
+  const router = useRouter();
   const [search, setSearch] = useState("");
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
@@ -35,21 +39,25 @@ export default function TargetsPage() {
 
   const canDelete = user?.role === 'admin_master' || user?.role === 'intelligence_manager';
 
-  const loadTargets = () => {
+  const loadTargets = useCallback(() => {
     setTargets(operationsService.getAllTargets());
-  };
+  }, []);
 
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isHydrated && !isAuthenticated) {
+        router.push("/login");
+    } else if (isHydrated && isAuthenticated) {
         loadTargets();
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, isHydrated, router, loadTargets, refreshKey]);
 
-  const filteredTargets = targets.filter(t => 
-    t.name.toLowerCase().includes(search.toLowerCase()) || 
-    t.nickname.toLowerCase().includes(search.toLowerCase()) ||
-    t.cpf.includes(search)
-  );
+  const filteredTargets = useMemo(() => {
+    return targets.filter(t => 
+        t.name.toLowerCase().includes(search.toLowerCase()) || 
+        t.nickname.toLowerCase().includes(search.toLowerCase()) ||
+        t.cpf.includes(search)
+    );
+  }, [targets, search]);
 
   const handleAddTarget = () => {
     setSelectedTarget(null);
@@ -66,7 +74,7 @@ export default function TargetsPage() {
     try {
       operationsService.deleteTarget(targetToDelete.id);
       toast.success("Alvo excluído com sucesso do sistema.");
-      loadTargets();
+      // Auto refresh via db-change
       setTargetToDelete(null);
     } catch (error) {
       toast.error("Erro ao excluir alvo.");
@@ -77,7 +85,6 @@ export default function TargetsPage() {
     try {
         operationsService.saveTarget(targetData);
         toast.success(selectedTarget ? "Alvo atualizado com sucesso" : "Alvo cadastrado com sucesso");
-        loadTargets();
         setIsModalOpen(false);
     } catch (error) {
         toast.error("Erro ao salvar alvo");
@@ -90,7 +97,7 @@ export default function TargetsPage() {
     return op ? op.title : "OPERAÇÃO DESCONHECIDA";
   };
 
-  if (!isAuthenticated) return null;
+  if (!isHydrated || !isAuthenticated) return null;
 
   return (
     <div className="flex">

@@ -77,6 +77,22 @@ export const operationsService = {
     };
 
     database.saveOperation(updatedOp);
+
+    // Audit for forced approval
+    const latestVal = data.validationHistory?.[data.validationHistory.length - 1];
+    if (latestVal?.reason?.includes("APROVAÇÃO FORÇADA")) {
+        database.addAuditLog({
+            actorId: latestVal.userId,
+            action: "WORKFLOW_FORCE_APPROVE",
+            targetEntity: "OPERATION",
+            targetId: id,
+            details: `Aprovação Administrativa Forçada: ${latestVal.reason}`,
+            timestamp: new Date().toISOString(),
+            oldData: { status: op.status, maturity: op.maturity },
+            newData: { status: updatedOp.status, justification: latestVal.reason }
+        });
+    }
+
     return updatedOp;
   },
 

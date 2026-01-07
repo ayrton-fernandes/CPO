@@ -34,7 +34,6 @@ const PERMISSIONS: { label: string; value: UserPermission }[] = [
 
 const MENUS = [
   { label: "Dashboard", path: "/dashboard" },
-  { label: "Mensagens", path: "/messages" },
   { label: "Minhas Operações", path: "/operations" },
   { label: "Banco de Alvos", path: "/targets" },
   { label: "Validações", path: "/validations" },

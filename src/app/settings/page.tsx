@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Textarea } from "@/components/ui/textarea";
 
 export default function SettingsPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
   const router = useRouter();
   const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
   const [justification, setJustification] = useState("");
@@ -30,9 +30,9 @@ export default function SettingsPage() {
   });
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isHydrated && !isAuthenticated) {
       router.push("/login");
-    } else if (user) {
+    } else if (isHydrated && user) {
         setProfileData({
             name: user.name || "",
             email: user.email || "",
@@ -40,7 +40,7 @@ export default function SettingsPage() {
             avatar: user.avatar || ""
         });
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, isHydrated, user, router]);
 
   const canManageCredentials = user?.permissions?.includes('MANAGE_CREDENTIALS');
 
@@ -84,7 +84,7 @@ export default function SettingsPage() {
     setJustification("");
   };
 
-  if (!isAuthenticated || !user) return null;
+  if (!isHydrated || !isAuthenticated || !user) return null;
 
   return (
     <div className="flex">

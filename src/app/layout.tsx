@@ -4,6 +4,8 @@ import { Toaster } from "sonner";
 import "./globals.css";
 import { ResetDemoButton } from "@/components/layout/reset-demo-button";
 import { AppShell } from "@/components/layout/app-shell";
+import { SessionMonitor } from "@/components/layout/session-monitor";
+import { MobileMenuProvider } from "@/components/layout/mobile-menu-context";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -30,9 +32,12 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <AppShell>
-          {children}
-        </AppShell>
+        <SessionMonitor />
+        <MobileMenuProvider>
+          <AppShell>
+            {children}
+          </AppShell>
+        </MobileMenuProvider>
         {/* <ResetDemoButton /> */}
         <Toaster richColors position="top-right" />
       </body>

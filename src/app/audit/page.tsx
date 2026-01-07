@@ -1,7 +1,8 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PageContainer } from "@/components/layout/page-container";
 import { database, AuditLog } from "@/services/database";
@@ -13,18 +14,25 @@ import { Input } from "@/components/ui/input";
 
 export default function AuditPage() {
   const { user, isAuthenticated } = useAuthStore();
+  const refreshKey = useDataRefresh();
   const router = useRouter();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [search, setSearch] = useState("");
   const [selectedLog, setSelectedLog] = useState<AuditLog | null>(null);
 
+  const loadLogs = useCallback(() => {
+    if (isAuthenticated && user?.role === 'admin_master') {
+        setLogs(database.get<AuditLog>('cpo_audit_logs'));
+    }
+  }, [isAuthenticated, user]);
+
   useEffect(() => {
     if (!isAuthenticated || user?.role !== 'admin_master') {
       router.push("/dashboard");
     } else {
-      setLogs(database.get<AuditLog>('cpo_audit_logs'));
+      loadLogs();
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, user, router, loadLogs, refreshKey]);
 
   if (!isAuthenticated || user?.role !== 'admin_master') return null;
 

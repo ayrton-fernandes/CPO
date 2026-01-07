@@ -8,15 +8,17 @@ import {
   FileText,
   ShieldAlert,
   ClipboardList,
-  Mail,
   BarChart3,
   Menu,
   X,
   RefreshCcw,
-  UserSquare2
+  UserSquare2,
+  LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
+import { useMobileMenu } from "./mobile-menu-context";
 import { operationsService } from "@/services/operationsService";
 import { Role } from "@/types";
 import { Button } from "../ui/button";
@@ -34,12 +36,6 @@ const NAV_ITEMS: NavItem[] = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
-    roles: ["admin_master", "intelligence_manager", "analyst", "investigator", "planning", "management"],
-  },
-  {
-    title: "Mensagens",
-    href: "/messages",
-    icon: Mail,
     roles: ["admin_master", "intelligence_manager", "analyst", "investigator", "planning", "management"],
   },
   {
@@ -88,8 +84,9 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar() {
   const pathname = usePathname();
-  const { user } = useAuthStore();
-  const [isOpen, setIsOpen] = useState(false);
+  const { user, logout } = useAuthStore();
+  const refreshKey = useDataRefresh();
+  const { isOpen, setIsOpen } = useMobileMenu();
 
   if (!user) return null;
 
@@ -103,19 +100,18 @@ export function Sidebar() {
 
   const handleResetDemo = () => {
     operationsService.resetData();
+    setIsOpen(false);
     toast.info("Ambiente reiniciado. Dados originais restaurados.");
     setTimeout(() => window.location.reload(), 500);
   };
 
+  const handleLogout = () => {
+    logout();
+    setIsOpen(false);
+  };
+
   return (
     <>
-      {/* Botão Hambúrguer Mobile */}
-      <div className="lg:hidden fixed top-4 right-4 z-50">
-        <Button variant="outline" size="icon" onClick={() => setIsOpen(!isOpen)} className="bg-white shadow-md">
-            {isOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </Button>
-      </div>
-
       {/* Overlay Mobile */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setIsOpen(false)} />
@@ -127,6 +123,9 @@ export function Sidebar() {
       )}>
         <div className="flex h-16 items-center border-b px-6 bg-gov-blue shrink-0">
             <span className="text-lg font-bold text-white tracking-wide">CPO Digital</span>
+            <Button variant="ghost" size="icon" onClick={() => setIsOpen(false)} className="ml-auto text-white lg:hidden">
+                <X className="h-5 w-5" />
+            </Button>
         </div>
         
         <div className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
@@ -164,8 +163,18 @@ export function Sidebar() {
             >
                 <RefreshCcw className="h-3 w-3 mr-2" /> Resetar Demonstração
             </Button>
+
+            {/* Logout Mobile Button */}
+            <Button 
+                variant="ghost" 
+                size="sm" 
+                className="w-full justify-start text-xs text-red-500 hover:text-red-600 hover:bg-red-50 lg:hidden"
+                onClick={handleLogout}
+            >
+                <LogOut className="h-3 w-3 mr-2" /> Sair do Sistema
+            </Button>
             
-            <div className="flex items-center gap-3 px-2 py-2">
+            <div className="flex items-center gap-3 px-2 py-2 border-t mt-2 pt-2">
                 <div className="h-8 w-8 rounded-full bg-gov-blue/10 flex items-center justify-center text-gov-blue font-bold text-xs uppercase">
                     {user.name.charAt(0)}
                 </div>

@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { User } from "@/types";
 import { usersService } from "@/services/usersService";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
 import { Button } from "@/components/ui/button";
 import { Edit2, Shield, UserPlus, Trash2, Calendar } from "lucide-react";
 import { UserFormModal } from "./user-form-modal";
@@ -10,9 +11,18 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 export function UserList() {
-  const [users, setUsers] = useState<User[]>(() => usersService.getAll());
+  const [users, setUsers] = useState<User[]>([]);
+  const refreshKey = useDataRefresh();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  const loadUsers = useCallback(() => {
+    setUsers(usersService.getAll());
+  }, []);
+
+  useEffect(() => {
+    loadUsers();
+  }, [loadUsers, refreshKey]);
 
 
   const handleCleanup = () => {

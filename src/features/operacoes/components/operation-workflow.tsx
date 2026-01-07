@@ -108,6 +108,16 @@ export function OperationWorkflow({ operation, onUpdate }: OperationWorkflowProp
                     >
                         <Send className="h-4 w-4 mr-2" /> Solicitar Validação
                     </Button>
+
+                    {isMaturityLow && hasApprovePermission && (
+                        <Button 
+                            variant="destructive" 
+                            className="flex-none bg-red-100 text-red-700 hover:bg-red-200 border border-red-200"
+                            onClick={() => setIsForceApprovalOpen(true)}
+                        >
+                            <ShieldAlert className="h-4 w-4 mr-2" /> Forçar Aprovação
+                        </Button>
+                    )}
                 </div>
             </div>
         );

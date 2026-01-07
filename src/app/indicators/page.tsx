@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { 
   BarChart, 
   Bar, 
@@ -8,30 +8,38 @@ import {
   YAxis, 
   CartesianGrid, 
   Tooltip, 
-  Legend, 
   ResponsiveContainer, 
   PieChart, 
   Pie, 
   Cell,
-  LineChart,
-  Line
 } from 'recharts';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { operationsService } from "@/services/operationsService";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Filter, TrendingUp, AlertCircle, Search, Calendar } from "lucide-react";
+import { Filter, TrendingUp, AlertCircle, Calendar } from "lucide-react";
 import { useAuthStore } from "@/hooks/useAuthStore";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PageContainer } from "@/components/layout/page-container";
+import { useRouter } from "next/navigation";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
 
 const COLORS = ['#003399', '#00C49F', '#FFBB28', '#FF8042', '#8884d8'];
 
 export default function IndicatorsPage() {
-  const { isAuthenticated } = useAuthStore();
-  const allOperations = operationsService.getAll();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const refreshKey = useDataRefresh();
+  const router = useRouter();
+  const [allOperations, setAllOperations] = useState(operationsService.getAll());
+  
   const [deptFilter, setDeptFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
+
+  useEffect(() => {
+    if (isHydrated && !isAuthenticated) {
+      router.push("/login");
+    } else if (isHydrated && isAuthenticated) {
+      setAllOperations(operationsService.getAll(user?.id, user?.role));
+    }
+  }, [isAuthenticated, isHydrated, router, user, refreshKey]);
 
   const departments = useMemo(() => {
     return ["ALL", ...Array.from(new Set(allOperations.map(op => op.department).filter(Boolean)))];
@@ -61,7 +69,7 @@ export default function IndicatorsPage() {
     })).sort((a, b) => a.maturidade - b.maturidade);
   }, [filteredData]);
 
-  if (!isAuthenticated) return null;
+  if (!isHydrated || !isAuthenticated) return null;
 
   return (
     <div className="flex">

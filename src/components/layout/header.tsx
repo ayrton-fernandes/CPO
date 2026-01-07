@@ -1,24 +1,29 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { Search, Bell, X, Check, Clock, ShieldAlert, FileText, LogOut, History, User as UserIcon } from "lucide-react";
+import { Search, Bell, X, Check, Clock, ShieldAlert, FileText, LogOut, History, User as UserIcon, Mail, Menu } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { operationsService } from "@/services/operationsService";
-import { database, AuditLog } from "@/services/database";
+import { database, AuditLog, Message } from "@/services/database";
 import { Operation } from "@/types";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNotificationStore } from "@/hooks/useNotificationStore";
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
+import { useMobileMenu } from "./mobile-menu-context";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatAuditLog } from "@/lib/utils";
 
 export function Header() {
+  const refreshKey = useDataRefresh();
+  const { toggle } = useMobileMenu();
   const [searchTerm, setSearchTerm] = useState("");
   const [results, setResults] = useState<Operation[]>([]);
   const [showResults, setShowResults] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const searchRef = useRef<HTMLDivElement>(null);
   const { user, logout } = useAuthStore();
   const { notifications, unreadCount, markAsRead, markAllAsRead, refresh } = useNotificationStore();
@@ -29,8 +34,12 @@ export function Header() {
   useEffect(() => {
     if (user) {
         refresh(user.id, user.role);
+        
+        // Count unread messages
+        const messages = database.getMessages(user.id);
+        setUnreadMessages(messages.filter(m => !m.isRead).length);
     }
-  }, [user, refresh]);
+  }, [user, refresh, refreshKey]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -88,13 +97,19 @@ export function Header() {
   };
 
   return (
-    <header className="h-16 border-b bg-white flex items-center justify-between px-4 lg:px-8 z-30 relative shadow-sm shrink-0 sticky top-0">
-      <div className="flex-1 max-w-xl relative" ref={searchRef}>
+    <header className="h-16 border-b bg-white flex items-center justify-between px-4 lg:px-8 z-30 relative shadow-sm shrink-0 sticky top-0 gap-2">
+      {/* Menu Trigger - Left Mobile */}
+      <Button variant="ghost" size="icon" onClick={toggle} className="lg:hidden order-1">
+        <Menu className="h-6 w-6 text-gray-600" />
+      </Button>
+
+      {/* Search Input - Center */}
+      <div className="flex-1 max-w-xl relative order-2" ref={searchRef}>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input 
-            placeholder="Buscar por operação, ID ou alvo..." 
-            className="pl-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors h-9"
+            placeholder="Buscar..." 
+            className="pl-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors h-9 text-sm md:placeholder:content-['Buscar_por_operação...']"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             onFocus={() => searchTerm.length > 1 && setShowResults(true)}
@@ -130,10 +145,22 @@ export function Header() {
         )}
       </div>
 
-      <div className="flex items-center gap-2 ml-4">
+      {/* Actions - Right */}
+      <div className="flex items-center gap-1 sm:gap-2 ml-auto order-3">
+        <Button variant="ghost" size="icon" asChild className="relative text-gray-500 hover:text-gov-blue scale-90 sm:scale-100">
+            <Link href="/messages">
+                <Mail className="h-5 w-5" />
+                {unreadMessages > 0 && (
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] text-white font-bold ring-2 ring-white">
+                        {unreadMessages}
+                    </span>
+                )}
+            </Link>
+        </Button>
+
         <Popover>
             <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative text-gray-500 hover:text-gov-blue">
+                <Button variant="ghost" size="icon" className="relative text-gray-500 hover:text-gov-blue scale-90 sm:scale-100">
                     <Bell className="h-5 w-5" />
                     {unreadCount > 0 && (
                         <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] text-white font-bold ring-2 ring-white">
@@ -201,12 +228,14 @@ export function Header() {
             variant="ghost" 
             size="icon" 
             onClick={handleLogout}
-            className="text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors"
+            className="text-gray-500 hover:text-red-600 hover:bg-red-50 transition-colors hidden lg:flex"
             title="Sair do Sistema"
         >
             <LogOut className="h-5 w-5" />
         </Button>
       </div>
+
+      {/* ... (Audit Modal remains same) */}
 
       <Dialog open={isAuditModalOpen} onOpenChange={setIsAuditModalOpen}>
         <DialogContent className="max-w-xl bg-white">

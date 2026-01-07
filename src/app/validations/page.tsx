@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
 import { operationsService } from "@/services/operationsService";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PageContainer } from "@/components/layout/page-container";
@@ -14,25 +15,31 @@ import { ClipboardCheck, ArrowRight, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 
 export default function ValidationsPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const refreshKey = useDataRefresh();
   const router = useRouter();
-  // Filter for AGUARDANDO_VALIDACAO status
-  const [operations, setOperations] = useState(
-    operationsService.getAll().filter(op => op.status === 'AGUARDANDO_VALIDACAO')
-  );
+  
+  const [operations, setOperations] = useState<any[]>([]);
+
+  const loadPending = useCallback(() => {
+    const all = operationsService.getAll(user?.id, user?.role);
+    setOperations(all.filter(op => op.status === 'AGUARDANDO_VALIDACAO'));
+  }, [user]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isHydrated && !isAuthenticated) {
       router.push("/login");
       return;
     }
-    if (user && user.role !== 'planning' && user.role !== 'admin_master') {
+    if (isHydrated && user && user.role !== 'planning' && user.role !== 'admin_master') {
          toast.error("Acesso restrito ao setor de Planejamento.");
          router.push("/dashboard");
+    } else if (isHydrated && isAuthenticated) {
+        loadPending();
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, isHydrated, user, router, loadPending, refreshKey]);
 
-  if (!isAuthenticated || (user?.role !== 'planning' && user?.role !== 'admin_master')) return null;
+  if (!isHydrated || !isAuthenticated || (user?.role !== 'planning' && user?.role !== 'admin_master')) return null;
 
   return (
     <div className="flex">

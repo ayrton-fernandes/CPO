@@ -1,26 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PageContainer } from "@/components/layout/page-container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { database, Message } from "@/services/database";
 import { usersService } from "@/services/usersService";
 import { operationsService } from "@/services/operationsService";
-import { Mail, Send, Plus, Search, User as UserIcon, Shield } from "lucide-react";
+import { Mail, Send, Plus, User as UserIcon } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
 
 export default function MessagesPage() {
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, isHydrated } = useAuthStore();
+  const refreshKey = useDataRefresh();
   const router = useRouter();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
@@ -33,25 +34,25 @@ export default function MessagesPage() {
     content: ""
   });
 
-  const loadMessages = () => {
+  const loadMessages = useCallback(() => {
     if (user) {
       setMessages(database.getMessages(user.id));
     }
-  };
+  }, [user]);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (isHydrated && !isAuthenticated) {
       router.push("/login");
-    } else {
+    } else if (isHydrated && isAuthenticated) {
       loadMessages();
     }
-  }, [isAuthenticated, user, router]);
+  }, [isAuthenticated, isHydrated, user, router, loadMessages, refreshKey]);
 
   const handleOpenMessage = (msg: Message) => {
     setSelectedMessage(msg);
     if (!msg.isRead) {
         database.markMessageAsRead(msg.id);
-        loadMessages();
+        // Dispatch event will trigger refreshKey
     }
   };
 
@@ -73,7 +74,6 @@ export default function MessagesPage() {
     toast.success("Mensagem enviada com sucesso!");
     setIsComposeOpen(false);
     setComposeData({ recipientIds: [], operationIds: [], subject: "", content: "" });
-    loadMessages();
   };
 
   const getSenderName = (id: string) => {
@@ -98,7 +98,7 @@ export default function MessagesPage() {
     }));
   };
 
-  if (!isAuthenticated || !user) return null;
+  if (!isHydrated || !isAuthenticated || !user) return null;
 
   const availableUsers = usersService.getAll().filter(u => u.id !== user.id);
   const availableOperations = operationsService.getAll(user.id, user.role);

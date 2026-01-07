@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { useAuthStore } from "@/hooks/useAuthStore";
+import { useDataRefresh } from "@/hooks/useDataRefresh";
 import { operationsService } from "@/services/operationsService";
 import { Operation } from "@/types";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,6 +15,7 @@ import { OperationsFilter, FilterState } from "@/features/operacoes/components/o
 
 export function DashboardContent() {
   const { user } = useAuthStore();
+  const refreshKey = useDataRefresh();
   const [allOperations, setAllOperations] = useState<Operation[]>([]);
   const [filters, setFilters] = useState<FilterState>({
     priority: null,
@@ -22,11 +24,15 @@ export function DashboardContent() {
     endDate: "",
   });
 
-  useEffect(() => {
+  const loadOperations = useCallback(() => {
     if (user) {
         setAllOperations(operationsService.getAll(user.id, user.role));
     }
   }, [user]);
+
+  useEffect(() => {
+    loadOperations();
+  }, [loadOperations, refreshKey]);
 
   const myOperations = useMemo(() => {
     return allOperations.filter(op => {

@@ -108,6 +108,7 @@ class DatabaseService {
   private save<T>(key: string, data: T[]) {
     if (typeof window === 'undefined') return;
     localStorage.setItem(key, JSON.stringify(data));
+    window.dispatchEvent(new Event('db-change'));
   }
 
   // --- Public API ---
