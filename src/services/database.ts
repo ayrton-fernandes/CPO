@@ -25,7 +25,7 @@ export interface Message {
   isRead: boolean;
 }
 
-export interface Notification {
+export interface Notification<TMetaData = unknown> {
   id: string;
   userId: string; // Recipient
   type: 'INFO' | 'WARNING' | 'ERROR' | 'SUCCESS' | 'CREDENTIAL_CHANGE_REQUEST';
@@ -33,10 +33,10 @@ export interface Notification {
   description: string;
   createdAt: string;
   isRead: boolean;
-  metadata?: any;
+  metadata?: TMetaData;
 }
 
-export interface AuditLog {
+export interface AuditLog<TData = unknown> {
   id: string;
   actorId: string;
   action: string;
@@ -44,8 +44,8 @@ export interface AuditLog {
   targetId: string;
   details: string;
   timestamp: string;
-  oldData?: any;
-  newData?: any;
+  oldData?: TData;
+  newData?: TData;
 }
 
 class DatabaseService {

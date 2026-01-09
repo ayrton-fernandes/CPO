@@ -27,6 +27,18 @@ export interface User {
   expirationDate?: string; // ISO Date for temporary profiles
 }
 
+export interface SaveUserDTO {
+  name: string;
+  email: string;
+  roles: UserRole[];
+  role: UserRole;
+  permissions: UserPermission[];
+  accessMenus: string[];
+  linkedOperations: string[];
+  expirationDate?: string;
+}
+
+
 // Alias for backward compatibility if needed, though we should prefer UserRole
 export type Role = UserRole;
 
@@ -85,6 +97,17 @@ export interface Operation {
   documents: OperationDocument[];
   reports: OperationReport[];
   validationHistory: ValidationEntry[];
+}
+
+export interface CreateOperationDTO{
+  title: string;
+  description: string;
+  priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  location: string;
+  department: string;
+  createdBy: string;
+  assignedAgents?: string[];
+  targets?: string[];
 }
 
 export interface OperationDocument {

@@ -40,7 +40,7 @@ const DICTIONARY: Record<string, string> = {
     linkedOperationIds: "Operações Vinculadas",
 };
 
-const formatValue = (value: any): string => {
+const formatValue = (value: unknown): string => {
     if (typeof value === 'boolean') {
         return value ? "SIM" : "NÃO";
     }
@@ -61,8 +61,8 @@ export function formatAuditLog(log: AuditLog): string[] {
         return [log.details];
     }
 
-    const oldData = (log.oldData || {}) as Record<string, any>;
-    const newData = (log.newData || {}) as Record<string, any>;
+    const oldData = (log.oldData || {}) as Record<string, unknown>;
+    const newData = (log.newData || {}) as Record<string, unknown>;
 
     // Special case for deletion
     if (log.action === "TARGET_DELETED" || (log.oldData && !log.newData)) {

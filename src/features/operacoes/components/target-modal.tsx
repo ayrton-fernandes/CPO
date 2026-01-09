@@ -28,6 +28,12 @@ const targetSchema = z.object({
   }))
 });
 
+interface conflictOperation {
+  id: string;
+  title: string;
+  department: string;
+}
+
 type TargetFormValues = z.infer<typeof targetSchema>;
 
 const extendedTargetSchema = targetSchema.extend({
@@ -35,7 +41,6 @@ const extendedTargetSchema = targetSchema.extend({
 });
 
 type ExtendedTargetFormValues = z.infer<typeof extendedTargetSchema>;
-
 interface TargetModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -45,7 +50,7 @@ interface TargetModalProps {
 }
 
 export function TargetModal({ isOpen, onClose, onSave, initialData, operationId }: TargetModalProps) {
-  const [conflictOp, setConflictOp] = useState<any>(null);
+  const [conflictOp, setConflictOp] = useState<Partial<conflictOperation> | null>(null);
   const operations = operationsService.getAll();
   const isLocalContext = !!operationId;
   
@@ -83,7 +88,7 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
           nickname: initialData.nickname || "",
           cpf: initialData.cpf || "",
           hasPhoto: initialData.hasPhoto || false,
-          periculosidade: initialData.riskLevel as any,
+          periculosidade: initialData.riskLevel,
           addresses: initialData.addresses.length > 0 
             ? initialData.addresses.map(a => ({
                 label: "Endereço", 
@@ -169,7 +174,7 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
     }
 
     // Ensure local context op is linked
-    let finalLinks = values.linkedOperationIds || [];
+    const finalLinks = values.linkedOperationIds || [];
     if (isLocalContext && operationId && !finalLinks.includes(operationId)) {
         finalLinks.push(operationId);
     }
@@ -234,7 +239,7 @@ export function TargetModal({ isOpen, onClose, onSave, initialData, operationId 
                 <p className="text-sm font-bold text-red-800">ALERTA DE DUPLICIDADE (CONFLITO)</p>
                 <p className="text-xs text-red-700">
                   Este alvo já é objeto de investigação ativa na operação: 
-                  <strong className="block mt-1 underline">"{conflictOp.title}" ({conflictOp.department})</strong>
+                  <strong className="block mt-1 underline">{conflictOp.title} - ({conflictOp.department})</strong>
                 </p>
               </div>
             </div>

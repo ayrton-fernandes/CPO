@@ -42,7 +42,7 @@ export function IndicatorsDashboard() {
   }, [allOperations, deptFilter, searchTerm]);
 
   const statusData = useMemo(() => {
-    const counts: any = {};
+    const counts: Record<string, number> = {};
     filteredData.forEach(op => {
       counts[op.status] = (counts[op.status] || 0) + 1;
     });

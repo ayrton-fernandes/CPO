@@ -1,4 +1,4 @@
-import { Operation, Target, OperationStatus } from "@/types";
+import { Operation, Target, OperationStatus, CreateOperationDTO } from "@/types";
 import { database } from "./database";
 import { calculateMaturity } from "./mockData";
 
@@ -159,9 +159,9 @@ export const operationsService = {
     return null;
   },
 
-  create: (data: any): Operation => {
+  create: (data: CreateOperationDTO): Operation => {
     const newId = `op-${Date.now()}`;
-    const newTargets = (data.targets || []).map((name: string) => ({
+    const newTargets = (data.targets || []).map<Target>((name: string) => ({
         id: `t-${Math.random().toString(36).substr(2, 9)}`,
         name: name,
         nickname: "",
